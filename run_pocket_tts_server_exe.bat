@@ -5,10 +5,11 @@ title Pocket TTS Server Launcher (EXE)
 
 echo.
 echo ========================================================
-echo        Pocket TTS OpenAI Streaming Server Launcher
-echo                    (Standalone EXE)
+echo         Pocket TTS OpenAI Streaming Server Launcher
+echo                     (Standalone EXE)
 echo ========================================================
 echo.
+
 :: 0. Hugging Face Authentication
 set "HF_TOKEN=your_token_here_if_you_want_to_hardcode_it"
 if "%HF_TOKEN%"=="your_token_here_if_you_want_to_hardcode_it" (
@@ -40,21 +41,19 @@ set /p "INPUT_MODEL=Model Path/Variant (Optional, default=built-in): "
 if not "%INPUT_MODEL%"=="" set "MODEL_PATH=--model_path ^"%INPUT_MODEL%^""
 
 :: 4. Voices Directory
-set "DEFAULT_VOICES=%~dp0voices"
-set /p "INPUT_VOICES=Voices Directory [%DEFAULT_VOICES%]: "
+:: Changed: Now remains empty if the user hits ENTER.
+set "VOICES_DIR="
+set /p "INPUT_VOICES=Voices Directory (Optional, leave blank to skip): "
 
-if "%INPUT_VOICES%"=="" (
-    :: If user hits ENTER, use the local folder path
-    set "VOICES_DIR=--voices_dir ^"!DEFAULT_VOICES!^""
-) else (
-    :: If user types a path, use that instead
+if not "%INPUT_VOICES%"=="" (
     set "VOICES_DIR=--voices_dir ^"%INPUT_VOICES%^""
 )
 
 :: 5. Streaming Default
-set "STREAM_ARG="
-set /p "INPUT_STREAM=Enable Streaming by default? (Y/N) [N]: "
-if /i "%INPUT_STREAM%"=="Y" set "STREAM_ARG=--stream"
+:: Changed: Defaults to ON. Only unsets if the user types 'N'.
+set "STREAM_ARG=--stream"
+set /p "INPUT_STREAM=Enable Streaming? (Y/N) [Y]: "
+if /i "%INPUT_STREAM%"=="N" set "STREAM_ARG="
 
 echo.
 echo ========================================================
@@ -62,8 +61,8 @@ echo Starting Pocket TTS Server (EXE)...
 echo Host: %HOST%
 echo Port: %PORT%
 if defined MODEL_PATH echo Model: %MODEL_PATH%
-if defined VOICES_DIR echo Voices: %VOICES_DIR%
-if defined STREAM_ARG echo Streaming: Enabled
+if defined VOICES_DIR (echo Voices: %VOICES_DIR%) else (echo Voices: Default/None)
+if defined STREAM_ARG (echo Streaming: Enabled) else (echo Streaming: Disabled)
 echo ========================================================
 echo.
 
