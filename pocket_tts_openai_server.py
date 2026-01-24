@@ -133,16 +133,20 @@ def list_voices():
     
     # 2. Scan Directory if configured
     if VOICES_DIR and os.path.isdir(VOICES_DIR):
-        # Scan for .wav files
-        wav_files = glob.glob(os.path.join(VOICES_DIR, "*.wav"))
-        for f in wav_files:
+        # Define supported extensions
+        extensions = ("*.wav", "*.mp3", "*.flac")
+        
+        # Gather all matching files
+        audio_files = []
+        for ext in extensions:
+            audio_files.extend(glob.glob(os.path.join(VOICES_DIR, ext)))
+
+        for f in audio_files:
             name = os.path.basename(f)
             # ID is the full path so the server can access it, or just filename if we handle resolution
-            # Let's use full absolute path for robustness or relative if clean.
-            # Using filename is nicer for UI, but 'voice' parameter needs to be resolvable.
-            # get_voice_state logic handles checking VOICES_DIR.
+            # Using filename for UI consistency as per original logic
             voices.append({
-                "id": name, # client sends this, get_voice_state resolves via VOICES_DIR
+                "id": name, 
                 "name": f"Local: {name}"
             })
 
@@ -252,7 +256,7 @@ def main():
     parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to run server")
     parser.add_argument("--port", type=int, default=5002, help="Port to run server")
     parser.add_argument("--stream", action="store_true", help="Enable streaming by default")
-    parser.add_argument("--voices_dir", type=str, default=None, help="Directory containing local voice .wav files")
+    parser.add_argument("--voices_dir", type=str, default=None, help="Directory containing local voice .wav, .mp3 or .flac files")
     
     args = parser.parse_args()
     

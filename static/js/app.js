@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const data = await res.json();
 
             // Clear existing except custom
-            voiceSelect.innerHTML = '<option value="custom">Custom (Upload .wav)...</option>';
+            voiceSelect.innerHTML = '<option value="custom">Custom (Upload .wav, .mp3, .flac)...</option>';
 
             if (data.data) {
                 // Add built-ins first
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     voiceSelect.addEventListener('change', (e) => {
         if (e.target.value === 'custom') {
             // Setup for Custom Path
-            document.querySelector('#custom-voice-group label').textContent = "Absolute Path to WAV File:";
+            document.querySelector('#custom-voice-group label').textContent = "Absolute Path to Audio File:";
             voiceFile.type = 'text';
             voiceFile.placeholder = "C:\\path\\to\\voice.wav";
             customVoiceGroup.classList.remove('hidden');
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let voice = voiceSelect.value;
         if (voice === 'custom') {
             voice = voiceFile.value.trim();
-            if (!voice) return alert("Please enter the path to the wave file.");
+            if (!voice) return alert("Please enter the path to the voice file.");
         }
 
         generateBtn.classList.add('loading');
