@@ -10,9 +10,6 @@ echo                     (Standalone EXE)
 echo ========================================================
 echo.
 
-:: Base directory of this BAT file
-set "BASE_DIR=%~dp0"
-
 :: 0. Hugging Face Authentication
 set "HF_TOKEN=your_token_here_if_you_want_to_hardcode_it"
 if "%HF_TOKEN%"=="your_token_here_if_you_want_to_hardcode_it" (
@@ -39,27 +36,21 @@ set /p "INPUT_PORT=Port [%PORT%]: "
 if not "%INPUT_PORT%"=="" set "PORT=%INPUT_PORT%"
 
 :: 3. Model Path
-:: Default to models\b6369a24.yaml relative to this BAT file
-set "DEFAULT_MODEL=%BASE_DIR%model\b6369a24.yaml"
 set "MODEL_PATH="
-
-set /p "INPUT_MODEL=Model Path/Variant (Optional, default=model\b6369a24.yaml): "
-
-if "%INPUT_MODEL%"=="" (
-    set "MODEL_PATH=--model_path ^"%DEFAULT_MODEL%^""
-) else (
-    set "MODEL_PATH=--model_path ^"%INPUT_MODEL%^""
-)
+set /p "INPUT_MODEL=Model Path/Variant (Optional, default=built-in): "
+if not "%INPUT_MODEL%"=="" set "MODEL_PATH=--model_path ^"%INPUT_MODEL%^""
 
 :: 4. Voices Directory
+:: Changed: Now remains empty if the user hits ENTER.
 set "VOICES_DIR="
 set /p "INPUT_VOICES=Voices Directory (Optional, leave blank to skip): "
 
-if not "%INPUT_VOICES%"=="" (
-    set "VOICES_DIR=--voices_dir ^"%INPUT_VOICES%^""
+if not "!INPUT_VOICES!"=="" (
+    set "VOICES_DIR=--voices_dir "!INPUT_VOICES!""
 )
 
 :: 5. Streaming Default
+:: Changed: Defaults to ON. Only unsets if the user types 'N'.
 set "STREAM_ARG=--stream"
 set /p "INPUT_STREAM=Enable Streaming? (Y/N) [Y]: "
 if /i "%INPUT_STREAM%"=="N" set "STREAM_ARG="
@@ -69,18 +60,18 @@ echo ========================================================
 echo Starting Pocket TTS Server (EXE)...
 echo Host: %HOST%
 echo Port: %PORT%
-echo Model: %MODEL_PATH%
+if defined MODEL_PATH echo Model: %MODEL_PATH%
 if defined VOICES_DIR (echo Voices: %VOICES_DIR%) else (echo Voices: Default/None)
 if defined STREAM_ARG (echo Streaming: Enabled) else (echo Streaming: Disabled)
 echo ========================================================
 echo.
 
 :: 6. Run Command
-if exist "%BASE_DIR%PocketTTS-Server.exe" (
-    "%BASE_DIR%PocketTTS-Server.exe" --host %HOST% --port %PORT% %MODEL_PATH% %VOICES_DIR% %STREAM_ARG%
+if exist "%~dp0PocketTTS-Server.exe" (
+    "%~dp0PocketTTS-Server.exe" --host %HOST% --port %PORT% %MODEL_PATH% %VOICES_DIR% %STREAM_ARG%
 ) else (
     echo [ERROR] PocketTTS-Server.exe not found in the current directory.
-    echo Please make sure the executable is located in: %BASE_DIR%
+    echo Please make sure the executable is located in: %~dp0
 )
 
 if %ERRORLEVEL% NEQ 0 (

@@ -12,4 +12,4 @@ pyinstaller --noconfirm --clean --onefile --icon=NONE ^
  --hidden-import "soundfile" ^
  pocket_tts_openai_server.py
  
-pyinstaller --noconfirm --clean --onefile --icon=pocket-tts-logo.ico --name "PocketTTS-Server" --add-data "utils.py;utils.py" --add-data "static;static" --add-data "templates;templates" --add-data "voices;voices" --collect-all "pocket_tts" --hidden-import "engineio.async_drivers.threading" --hidden-import "flask" --hidden-import "torch" --hidden-import "torchaudio" --hidden-import "soundfile" pocket_tts_openai_server.py
+pyinstaller --noconfirm --clean --onefile --icon=pocket-tts-logo.ico --name "PocketTTS-Server" --add-data "utils.py;utils.py" --add-data "static;static" --add-data "model;model" --add-data "templates;templates" --add-data "voices;voices" --collect-all "pocket_tts" --hidden-import "engineio.async_drivers.threading" --hidden-import "flask" --hidden-import "torch" --hidden-import "torchaudio" --hidden-import "soundfile" pocket_tts_openai_server.py

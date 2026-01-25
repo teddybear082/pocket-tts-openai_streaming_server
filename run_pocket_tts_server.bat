@@ -50,12 +50,10 @@ if not "%INPUT_MODEL%"=="" set "MODEL_PATH=--model_path ^"%INPUT_MODEL%^""
 set "DEFAULT_VOICES=%~dp0voices"
 set /p "INPUT_VOICES=Voices Directory [%DEFAULT_VOICES%]: "
 
-if "%INPUT_VOICES%"=="" (
-    :: If user hits ENTER, use the local folder path
-    set "VOICES_DIR=--voices_dir ^"!DEFAULT_VOICES!^""
+if "!INPUT_VOICES!"=="" (
+    set "VOICES_DIR_ARG=--voices_dir "!DEFAULT_VOICES!""
 ) else (
-    :: If user types a path, use that instead
-    set "VOICES_DIR=--voices_dir ^"%INPUT_VOICES%^""
+    set "VOICES_DIR_ARG=--voices_dir "!INPUT_VOICES!""
 )
 
 :: 6. Streaming Default
@@ -76,7 +74,7 @@ echo ========================================================
 echo.
 
 :: 7. Run Command
-python pocket_tts_openai_server.py --host %HOST% --port %PORT% %MODEL_PATH% %VOICES_DIR% %STREAM_ARG%
+python pocket_tts_openai_server.py --host %HOST% --port %PORT% %MODEL_PATH% %VOICES_DIR_ARG% %STREAM_ARG%
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
