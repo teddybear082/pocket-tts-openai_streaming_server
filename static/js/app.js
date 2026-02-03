@@ -8,6 +8,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 	const audioPlayer = document.getElementById('audio-player');
 	const downloadBtn = document.getElementById('download-btn');
 	const streamToggle = document.getElementById('stream-toggle');
+	const speedSlider = document.getElementById('speed-slider');
+	const speedValue = document.getElementById('speed-value');
+
+	// Update speed label
+	speedSlider.addEventListener('input', (e) => {
+		speedValue.textContent = e.target.value;
+	});
 
 	// 1. Load Voices
 	async function loadVoices() {
@@ -73,6 +80,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 		if (!text) return alert('Please enter text');
 
 		const stream = streamToggle.checked;
+		const speed = parseFloat(speedSlider.value);
 
 		let voice = voiceSelect.value;
 		if (voice === 'custom') {
@@ -94,6 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 					voice: voice,
 					response_format: 'wav',
 					stream: stream,
+					speed: speed,
 				}),
 			});
 

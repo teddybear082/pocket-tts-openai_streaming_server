@@ -135,7 +135,7 @@ class TTSService:
             raise RuntimeError('Model not loaded. Call load_model() first.')
 
         # Resolve the voice path
-        resolved_key = self._resolve_voice_path(voice_id_or_path)
+        resolved_key = self.resolve_voice_path(voice_id_or_path)
 
         # Check cache
         if resolved_key in self.voice_cache:
@@ -157,7 +157,7 @@ class TTSService:
             logger.error(f"Failed to load voice '{voice_id_or_path}': {e}")
             raise ValueError(f"Voice '{voice_id_or_path}' could not be loaded: {e}") from e
 
-    def _resolve_voice_path(self, voice_id_or_path: str) -> str:
+    def resolve_voice_path(self, voice_id_or_path: str) -> str:
         """
         Resolve a voice identifier to its actual path or ID.
 
@@ -224,7 +224,7 @@ class TTSService:
             )
 
         try:
-            resolved = self._resolve_voice_path(voice_id_or_path)
+            resolved = self.resolve_voice_path(voice_id_or_path)
         except ValueError as e:
             return False, str(e)
 

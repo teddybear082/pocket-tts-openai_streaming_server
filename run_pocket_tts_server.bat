@@ -44,16 +44,16 @@ if not "%INPUT_PORT%"=="" set "PORT=%INPUT_PORT%"
 :: 4. Model Path
 set "MODEL_PATH="
 set /p "INPUT_MODEL=Model Path/Variant (Optional, default=built-in): "
-if not "%INPUT_MODEL%"=="" set "MODEL_PATH=--model_path ^"%INPUT_MODEL%^""
+if not "%INPUT_MODEL%"=="" set "MODEL_PATH=--model-path ^"%INPUT_MODEL%^""
 
 :: 5. Voices Directory
 set "DEFAULT_VOICES=%~dp0voices"
 set /p "INPUT_VOICES=Voices Directory [%DEFAULT_VOICES%]: "
 
 if "!INPUT_VOICES!"=="" (
-    set "VOICES_DIR_ARG=--voices_dir "!DEFAULT_VOICES!""
+    set "VOICES_DIR_ARG=--voices-dir "!DEFAULT_VOICES!""
 ) else (
-    set "VOICES_DIR_ARG=--voices_dir "!INPUT_VOICES!""
+    set "VOICES_DIR_ARG=--voices-dir "!INPUT_VOICES!""
 )
 
 :: 6. Streaming Default
@@ -74,7 +74,7 @@ echo ========================================================
 echo.
 
 :: 7. Run Command
-python pocket_tts_openai_server.py --host %HOST% --port %PORT% %MODEL_PATH% %VOICES_DIR_ARG% %STREAM_ARG%
+python server.py --host %HOST% --port %PORT% %MODEL_PATH% %VOICES_DIR_ARG% %STREAM_ARG%
 
 if %ERRORLEVEL% NEQ 0 (
     echo.

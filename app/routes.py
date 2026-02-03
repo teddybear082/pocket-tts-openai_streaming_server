@@ -23,8 +23,45 @@ from app.services.audio import (
     write_wav_header,
 )
 from app.services.tts import get_tts_service
+import librosa
+import soundfile as sf
+import uuid
+import os
+import atexit
+import shutil
 
 logger = get_logger('routes')
+
+# Temporary directory for modified voices
+TEMP_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'temp_audio')
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+
+def cleanup_temp_files():
+    """Delete all temporary audio files."""
+    try:
+        if os.path.exists(TEMP_DIR):
+            for filename in os.listdir(TEMP_DIR):
+                file_path = os.path.join(TEMP_DIR, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    logger.error(f'Failed to delete {file_path}. Reason: {e}')
+            logger.info('Temporary files cleaned up')
+    except Exception as e:
+        logger.error(f'Error during cleanup: {e}')
+
+
+# Register cleanup on exit
+atexit.register(cleanup_temp_files)
+
+# Register cleanup on startup (call it immediately)
+cleanup_temp_files()
+
+
 
 # Create blueprint
 api = Blueprint('api', __name__)
@@ -80,6 +117,15 @@ def list_voices():
     )
 
 
+@api.route('/delete_temp_files', methods=['POST'])
+def delete_temp_files():
+    """
+    Force deletion of all temporary files.
+    """
+    cleanup_temp_files()
+    return jsonify({'status': 'success', 'message': 'Temporary files deleted'}), 200
+
+
 @api.route('/v1/audio/speech', methods=['POST'])
 def generate_speech():
     """
@@ -107,6 +153,7 @@ def generate_speech():
         return jsonify({'error': "Missing 'input' text"}), 400
 
     voice = data.get('voice', 'alba')
+    speed = float(data.get('speed', 1.0))
     stream_request = data.get('stream', False)
 
     # Determine format based on streaming
@@ -118,6 +165,39 @@ def generate_speech():
     target_format = validate_format(response_format)
 
     tts = get_tts_service()
+
+    # Handle speed adjustment
+    temp_voice_path = None
+    if speed != 1.0:
+        try:
+            # Resolve original voice path
+            original_voice_path = tts.resolve_voice_path(voice)
+            
+            # Load audio with librosa
+            # target_sr=None preserves native sampling rate
+            y, sr = librosa.load(original_voice_path, sr=None)
+            
+            # Time-stretch
+            # rate > 1.0 speeds up, rate < 1.0 slows down
+            y_stretched = librosa.effects.time_stretch(y, rate=speed)
+            
+            # Save to temp file
+            unique_filename = f"{uuid.uuid4()}_{os.path.basename(original_voice_path)}"
+            if not unique_filename.endswith('.wav'):
+                 unique_filename += '.wav'
+            
+            temp_voice_path = os.path.join(TEMP_DIR, unique_filename)
+            sf.write(temp_voice_path, y_stretched, sr)
+            
+            # Use temp file as voice
+            voice = temp_voice_path
+            
+        except Exception as e:
+            logger.warning(f"Failed to apply speed modifier {speed}: {e}. Using original voice.")
+            # If we created a file but failed later, cleanup
+            if temp_voice_path and os.path.exists(temp_voice_path):
+                os.unlink(temp_voice_path)
+            temp_voice_path = None
 
     # Validate voice first
     is_valid, msg = tts.validate_voice(voice)

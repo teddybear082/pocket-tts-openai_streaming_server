@@ -1,221 +1,213 @@
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Pocket TTS - Local Streaming</title>
-		<link rel="stylesheet" href="/static/css/style.css" />
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link
-			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-			rel="stylesheet"
-		/>
-	</head>
-	<body>
-		<script>
-			// Pass server config to JavaScript
-			window.POCKET_TTS_CONFIG = {
-			    isDocker: {{ 'true' if is_docker else 'false' }}
+
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Pocket TTS - Local Streaming</title>
+	<link rel="stylesheet" href="/static/css/style.css" />
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+
+<body>
+	<script>
+		// Pass server config to JavaScript
+		window.POCKET_TTS_CONFIG = {
+			isDocker: {{ 'true' if is_docker else 'false' }}
 			};
-		</script>
+	</script>
 
-		<div class="container">
-			<header>
-				<img
-					src="/static/images/pocket-tts-logo.png"
-					alt="Pocket TTS Logo"
-					class="logo"
-				/>
-				<h1>Pocket TTS</h1>
-				<p class="subtitle">Real-time local speech synthesis & voice cloning</p>
-			</header>
+	<div class="container">
+		<header>
+			<img src="/static/images/pocket-tts-logo.png" alt="Pocket TTS Logo" class="logo" />
+			<h1>Pocket TTS</h1>
+			<p class="subtitle">Real-time local speech synthesis & voice cloning</p>
+		</header>
 
-			<div class="content">
-				<div class="control-group">
-					<label for="text-input">Text Prompt</label>
-					<textarea
-						id="text-input"
-						placeholder="Enter text to generate speech..."
-					>
-Hello! I am Pocket TTS, running locally on your machine. I can clone voices and stream audio in real-time.</textarea
-					>
-				</div>
-
-				<div class="control-group">
-					<label for="voice-select">Voice Selection</label>
-					<select id="voice-select">
-						<!-- Populated by JS -->
-						<option value="custom">
-							Custom (Upload .wav, .mp3, or .flac)...
-						</option>
-					</select>
-				</div>
-
-				<div class="control-group hidden" id="custom-voice-group">
-					<label for="voice-file"
-						>Upload Reference Audio (WAV, MP3, FLAC)</label
-					>
-					<input type="file" id="voice-file" accept=".wav,.mp3,.flac" />
-				</div>
-
-				<div class="control-group">
-					<label
-						for="stream-toggle"
-						style="display: inline-flex; align-items: center; cursor: pointer"
-					>
-						<input
-							type="checkbox"
-							id="stream-toggle"
-							checked
-							style="width: auto; margin-right: 8px"
-						/>
-						Enable Streaming Response
-					</label>
-				</div>
-
-				<button id="generate-btn" class="btn-primary">
-					<span>Generate Speech</span>
-					<div class="spinner"></div>
-				</button>
-
-				<div class="output-section" id="output-section">
-					<audio id="audio-player" controls></audio>
-					<br />
-					<a href="#" id="download-btn" class="download-link">Download Audio</a>
-				</div>
+		<div class="content">
+			<div class="control-group">
+				<label for="text-input">Text Prompt</label>
+				<textarea id="text-input" placeholder="Enter text to generate speech...">
+Hello! I am Pocket TTS, running locally on your machine. I can clone voices and stream audio in real-time.</textarea>
 			</div>
 
-			<!-- API Documentation -->
-			<div class="api-docs">
-				<h2>API Documentation</h2>
-				<p class="api-intro">
-					OpenAI-compatible TTS API. Use any OpenAI TTS client by pointing it to
-					this server.
-				</p>
+			<div class="control-group">
+				<label for="voice-select">Voice Selection</label>
+				<select id="voice-select">
+					<!-- Populated by JS -->
+					<option value="custom">
+						Custom (Upload .wav, .mp3, or .flac)...
+					</option>
+				</select>
+			</div>
 
-				<!-- Health Endpoint -->
-				<div class="endpoint">
-					<div class="endpoint-header">
-						<span class="method get">GET</span>
-						<code class="path">/health</code>
-					</div>
-					<p class="endpoint-desc">
-						Health check endpoint for container orchestration and monitoring.
-					</p>
-					<div class="response-example">
-						<strong>Response:</strong>
-						<pre>
+			<div class="control-group">
+				<label for="speed-slider">Speed: <span id="speed-value">1.0</span>x</label>
+				<input type="range" id="speed-slider" min="0.5" max="3.0" step="0.1" value="1.0" style="width: 100%" />
+			</div>
+
+			<div class="control-group hidden" id="custom-voice-group">
+				<label for="voice-file">Upload Reference Audio (WAV, MP3, FLAC)</label>
+				<input type="file" id="voice-file" accept=".wav,.mp3,.flac" />
+			</div>
+
+			<div class="control-group">
+				<label for="stream-toggle" style="display: inline-flex; align-items: center; cursor: pointer">
+					<input type="checkbox" id="stream-toggle" checked style="width: auto; margin-right: 8px" />
+					Enable Streaming Response
+				</label>
+			</div>
+			<!-- skipped lines -->
+			<tr>
+				<td><code>speed</code></td>
+				<td>number</td>
+				<td></td>
+				<td><code>1.0</code></td>
+				<td>Playback speed (0.5 to 3.0)</td>
+			</tr>
+
+			<button id="generate-btn" class="btn-primary">
+				<span>Generate Speech</span>
+				<div class="spinner"></div>
+			</button>
+
+			<div class="output-section" id="output-section">
+				<audio id="audio-player" controls></audio>
+				<br />
+				<a href="#" id="download-btn" class="download-link">Download Audio</a>
+			</div>
+		</div>
+
+		<!-- API Documentation -->
+		<div class="api-docs">
+			<h2>API Documentation</h2>
+			<p class="api-intro">
+				OpenAI-compatible TTS API. Use any OpenAI TTS client by pointing it to
+				this server.
+			</p>
+
+			<!-- Health Endpoint -->
+			<div class="endpoint">
+				<div class="endpoint-header">
+					<span class="method get">GET</span>
+					<code class="path">/health</code>
+				</div>
+				<p class="endpoint-desc">
+					Health check endpoint for container orchestration and monitoring.
+				</p>
+				<div class="response-example">
+					<strong>Response:</strong>
+					<pre>
 {
   "status": "healthy",
   "model_loaded": true,
   "device": "cpu",
   "sample_rate": 24000
-}</pre
-						>
-					</div>
+}</pre>
 				</div>
+			</div>
 
-				<!-- List Voices Endpoint -->
-				<div class="endpoint">
-					<div class="endpoint-header">
-						<span class="method get">GET</span>
-						<code class="path">/v1/voices</code>
-					</div>
-					<p class="endpoint-desc">
-						List all available voices (built-in and custom).
-					</p>
-					<div class="response-example">
-						<strong>Response:</strong>
-						<pre>
+			<!-- List Voices Endpoint -->
+			<div class="endpoint">
+				<div class="endpoint-header">
+					<span class="method get">GET</span>
+					<code class="path">/v1/voices</code>
+				</div>
+				<p class="endpoint-desc">
+					List all available voices (built-in and custom).
+				</p>
+				<div class="response-example">
+					<strong>Response:</strong>
+					<pre>
 {
   "object": "list",
   "data": [
     {"id": "alba", "name": "Alba", "object": "voice"},
     {"id": "marius", "name": "Marius", "object": "voice"}
   ]
-}</pre
-						>
-					</div>
+}</pre>
+				</div>
+			</div>
+
+			<!-- Generate Speech Endpoint -->
+			<div class="endpoint">
+				<div class="endpoint-header">
+					<span class="method post">POST</span>
+					<code class="path">/v1/audio/speech</code>
+				</div>
+				<p class="endpoint-desc">
+					Generate speech audio from text. OpenAI-compatible endpoint.
+				</p>
+
+				<div class="params-section">
+					<strong>Request Body (JSON):</strong>
+					<table class="params-table">
+						<thead>
+							<tr>
+								<th>Parameter</th>
+								<th>Type</th>
+								<th>Required</th>
+								<th>Default</th>
+								<th>Description</th>
+							</tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td><code>input</code></td>
+								<td>string</td>
+								<td>✓</td>
+								<td>-</td>
+								<td>The text to generate speech from (max 4096 chars)</td>
+							</tr>
+							<tr>
+								<td><code>voice</code></td>
+								<td>string</td>
+								<td></td>
+								<td><code>alba</code></td>
+								<td>
+									Voice ID, filename, or URL. See <code>/v1/voices</code>
+								</td>
+							</tr>
+							<tr>
+								<td><code>model</code></td>
+								<td>string</td>
+								<td></td>
+								<td>-</td>
+								<td>Ignored (for OpenAI compatibility)</td>
+							</tr>
+							<tr>
+								<td><code>response_format</code></td>
+								<td>string</td>
+								<td></td>
+								<td><code>mp3</code></td>
+								<td>
+									Audio format: <code>mp3</code>, <code>wav</code>,
+									<code>pcm</code>, <code>opus</code>, <code>flac</code>
+								</td>
+							</tr>
+							<tr>
+								<td><code>stream</code></td>
+								<td>boolean</td>
+								<td></td>
+								<td><code>true</code></td>
+								<td>Enable streaming response for real-time playback</td>
+							</tr>
+							<tr>
+								<td><code>speed</code></td>
+								<td>number</td>
+								<td></td>
+								<td><code>1.0</code></td>
+								<td>Playback speed (0.5 to 3.0)</td>
+							</tr>
+						</tbody>
+					</table>
 				</div>
 
-				<!-- Generate Speech Endpoint -->
-				<div class="endpoint">
-					<div class="endpoint-header">
-						<span class="method post">POST</span>
-						<code class="path">/v1/audio/speech</code>
-					</div>
-					<p class="endpoint-desc">
-						Generate speech audio from text. OpenAI-compatible endpoint.
-					</p>
-
-					<div class="params-section">
-						<strong>Request Body (JSON):</strong>
-						<table class="params-table">
-							<thead>
-								<tr>
-									<th>Parameter</th>
-									<th>Type</th>
-									<th>Required</th>
-									<th>Default</th>
-									<th>Description</th>
-								</tr>
-							</thead>
-							<tbody>
-								<tr>
-									<td><code>input</code></td>
-									<td>string</td>
-									<td>✓</td>
-									<td>-</td>
-									<td>The text to generate speech from (max 4096 chars)</td>
-								</tr>
-								<tr>
-									<td><code>voice</code></td>
-									<td>string</td>
-									<td></td>
-									<td><code>alba</code></td>
-									<td>
-										Voice ID, filename, or URL. See <code>/v1/voices</code>
-									</td>
-								</tr>
-								<tr>
-									<td><code>model</code></td>
-									<td>string</td>
-									<td></td>
-									<td>-</td>
-									<td>Ignored (for OpenAI compatibility)</td>
-								</tr>
-								<tr>
-									<td><code>response_format</code></td>
-									<td>string</td>
-									<td></td>
-									<td><code>mp3</code></td>
-									<td>
-										Audio format: <code>mp3</code>, <code>wav</code>,
-										<code>pcm</code>, <code>opus</code>, <code>flac</code>
-									</td>
-								</tr>
-								<tr>
-									<td><code>stream</code></td>
-									<td>boolean</td>
-									<td></td>
-									<td><code>true</code></td>
-									<td>Enable streaming response for real-time playback</td>
-								</tr>
-								<!-- <tr>
-									<td><code>speed</code></td>
-									<td>number</td>
-									<td></td>
-									<td><code>1.0</code></td>
-									<td>Playback speed (0.25 to 4.0)</td>
-								</tr> -->
-							</tbody>
-						</table>
-					</div>
-
-					<div class="example-section">
-						<strong>Example Request (curl):</strong>
-						<pre>
+				<div class="example-section">
+					<strong>Example Request (curl):</strong>
+					<pre>
 curl -X POST http://localhost:49112/v1/audio/speech \
   -H "Content-Type: application/json" \
   -d '{
@@ -223,13 +215,12 @@ curl -X POST http://localhost:49112/v1/audio/speech \
     "voice": "alba",
     "response_format": "mp3"
   }' \
-  --output speech.mp3</pre
-						>
-					</div>
+  --output speech.mp3</pre>
+				</div>
 
-					<div class="example-section">
-						<strong>Example (Python with OpenAI client):</strong>
-						<pre>
+				<div class="example-section">
+					<strong>Example (Python with OpenAI client):</strong>
+					<pre>
 from openai import OpenAI
 
 client = OpenAI(
@@ -242,53 +233,50 @@ response = client.audio.speech.create(
     voice="alba",
     input="Hello world!"
 )
-response.stream_to_file("output.mp3")</pre
-						>
-					</div>
-
-					<div class="response-example">
-						<strong>Response:</strong>
-						<p>Audio file in the requested format (binary stream).</p>
-						<p>
-							<strong>Content-Type:</strong> <code>audio/mpeg</code>,
-							<code>audio/wav</code>, <code>audio/opus</code>, etc.
-						</p>
-					</div>
-
-					<div class="error-section">
-						<strong>Error Response:</strong>
-						<pre>
-{
-  "error": "Missing required field: input"
-}</pre
-						>
-					</div>
+response.stream_to_file("output.mp3")</pre>
 				</div>
 
-				<!-- Built-in Voices Reference -->
-				<div class="voices-reference">
-					<h3>Built-in Voices</h3>
-					<p>These voices work without authentication:</p>
-					<div class="voice-chips">
-						<span class="voice-chip">alba</span>
-						<span class="voice-chip">marius</span>
-						<span class="voice-chip">javert</span>
-						<span class="voice-chip">jean</span>
-						<span class="voice-chip">fantine</span>
-						<span class="voice-chip">cosette</span>
-						<span class="voice-chip">eponine</span>
-						<span class="voice-chip">azelma</span>
-					</div>
-					<p class="voice-note">
-						Custom voice cloning requires a
-						<a href="https://huggingface.co/kyutai/pocket-tts" target="_blank"
-							>HuggingFace token</a
-						>.
+				<div class="response-example">
+					<strong>Response:</strong>
+					<p>Audio file in the requested format (binary stream).</p>
+					<p>
+						<strong>Content-Type:</strong> <code>audio/mpeg</code>,
+						<code>audio/wav</code>, <code>audio/opus</code>, etc.
 					</p>
 				</div>
+
+				<div class="error-section">
+					<strong>Error Response:</strong>
+					<pre>
+{
+  "error": "Missing required field: input"
+}</pre>
+				</div>
+			</div>
+
+			<!-- Built-in Voices Reference -->
+			<div class="voices-reference">
+				<h3>Built-in Voices</h3>
+				<p>These voices work without authentication:</p>
+				<div class="voice-chips">
+					<span class="voice-chip">alba</span>
+					<span class="voice-chip">marius</span>
+					<span class="voice-chip">javert</span>
+					<span class="voice-chip">jean</span>
+					<span class="voice-chip">fantine</span>
+					<span class="voice-chip">cosette</span>
+					<span class="voice-chip">eponine</span>
+					<span class="voice-chip">azelma</span>
+				</div>
+				<p class="voice-note">
+					Custom voice cloning requires a
+					<a href="https://huggingface.co/kyutai/pocket-tts" target="_blank">HuggingFace token</a>.
+				</p>
 			</div>
 		</div>
+	</div>
 
-		<script src="/static/js/app.js"></script>
-	</body>
+	<script src="/static/js/app.js"></script>
+</body>
+
 </html>
