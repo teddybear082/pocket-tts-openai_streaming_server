@@ -2,8 +2,14 @@
 Flask routes for the OpenAI-compatible TTS API.
 """
 
+import atexit
+import os
+import shutil
 import time
+import uuid
 
+import librosa
+import soundfile as sf
 from flask import (
     Blueprint,
     Response,
@@ -23,12 +29,6 @@ from app.services.audio import (
     write_wav_header,
 )
 from app.services.tts import get_tts_service
-import librosa
-import soundfile as sf
-import uuid
-import os
-import atexit
-import shutil
 
 logger = get_logger('routes')
 
@@ -172,26 +172,26 @@ def generate_speech():
         try:
             # Resolve original voice path
             original_voice_path = tts.resolve_voice_path(voice)
-            
+
             # Load audio with librosa
             # target_sr=None preserves native sampling rate
             y, sr = librosa.load(original_voice_path, sr=None)
-            
+
             # Time-stretch
             # rate > 1.0 speeds up, rate < 1.0 slows down
             y_stretched = librosa.effects.time_stretch(y, rate=speed)
-            
+
             # Save to temp file
             unique_filename = f"{uuid.uuid4()}_{os.path.basename(original_voice_path)}"
             if not unique_filename.endswith('.wav'):
                  unique_filename += '.wav'
-            
+
             temp_voice_path = os.path.join(TEMP_DIR, unique_filename)
             sf.write(temp_voice_path, y_stretched, sr)
-            
+
             # Use temp file as voice
             voice = temp_voice_path
-            
+
         except Exception as e:
             logger.warning(f"Failed to apply speed modifier {speed}: {e}. Using original voice.")
             # If we created a file but failed later, cleanup
