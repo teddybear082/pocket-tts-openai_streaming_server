@@ -4,7 +4,7 @@ license = {text = "MIT"}
 name = "pocket-tts-openai-server"
 readme = "README.md"
 requires-python = ">=3.10"
-version = "2.0.0"
+version = "2.1.0"
 
 dependencies = [
   "flask>=3.0.0",
