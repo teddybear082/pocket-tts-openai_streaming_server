@@ -135,8 +135,7 @@ def generate_speech():
         # Streaming supports only PCM/WAV today; fall back to file for other formats.
         if use_streaming and target_format not in ('pcm', 'wav'):
             logger.warning(
-                "Streaming format '%s' is not supported; returning full '%s' file instead.",
-                target_format,
+                "Streaming format '%s' is not supported; returning full file instead.",
                 target_format,
             )
             use_streaming = False
