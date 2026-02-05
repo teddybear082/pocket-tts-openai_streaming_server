@@ -109,12 +109,7 @@ def generate_speech():
     voice = data.get('voice', 'alba')
     stream_request = data.get('stream', False)
 
-    # Determine format based on streaming
-    if stream_request:
-        response_format = data.get('response_format', 'pcm')
-    else:
-        response_format = data.get('response_format', 'mp3')
-
+    response_format = data.get('response_format', 'mp3')
     target_format = validate_format(response_format)
 
     tts = get_tts_service()
@@ -137,10 +132,18 @@ def generate_speech():
         # Check if streaming should be used
         use_streaming = stream_request or current_app.config.get('STREAM_DEFAULT', False)
 
+        # Streaming supports only PCM/WAV today; fall back to file for other formats.
+        if use_streaming and target_format not in ('pcm', 'wav'):
+            logger.warning(
+                "Streaming format '%s' is not supported; returning full '%s' file instead.",
+                target_format,
+                target_format,
+            )
+            use_streaming = False
+
         if use_streaming:
             return _stream_audio(tts, voice_state, text, target_format)
-        else:
-            return _generate_file(tts, voice_state, text, target_format)
+        return _generate_file(tts, voice_state, text, target_format)
 
     except ValueError as e:
         logger.warning(f'Voice loading failed: {e}')
