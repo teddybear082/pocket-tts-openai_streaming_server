@@ -75,7 +75,15 @@ def list_voices():
     return jsonify(
         {
             'object': 'list',
-            'data': [{'id': v['id'], 'name': v['name'], 'object': 'voice'} for v in voices],
+            'data': [
+                {
+                    'id': v['id'],
+                    'name': v['name'],
+                    'object': 'voice',
+                    'type': v.get('type', 'builtin'),
+                }
+                for v in voices
+            ],
         }
     )
 

@@ -289,24 +289,37 @@ class TTSService:
         """
         voices = []
 
-        # Built-in voices
-        for voice in Config.BUILTIN_VOICES:
+        # Built-in voices (sorted alphabetically)
+        builtin_sorted = sorted(Config.BUILTIN_VOICES)
+        for voice in builtin_sorted:
             voices.append({'id': voice, 'name': voice.capitalize(), 'type': 'builtin'})
 
         # Custom voices from directory
+        custom_voices = []
         if self.voices_dir and os.path.isdir(self.voices_dir):
-            for ext in Config.VOICE_EXTENSIONS:
-                pattern = f'*{ext}'
-                voice_dir = Path(self.voices_dir)
-                for voice_file in voice_dir.glob(pattern):
-                    voices.append(
-                        {
-                            'id': voice_file.name,
-                            'name': f'Custom: {voice_file.stem}',
-                            'type': 'custom',
-                        }
-                    )
+            voice_dir = Path(self.voices_dir)
 
+            # Collect all valid files
+            voice_files = []
+            for ext in Config.VOICE_EXTENSIONS:
+                voice_files.extend(voice_dir.glob(f'*{ext}'))
+
+            # Sort alphabetically by filename
+            voice_files.sort(key=lambda f: f.name.lower())
+
+            for voice_file in voice_files:
+                # Format name: "bobby_mcfern" -> "Bobby Mcfern"
+                clean_name = voice_file.stem.replace('_', ' ').replace('-', ' ').title()
+
+                custom_voices.append(
+                    {
+                        'id': voice_file.name,
+                        'name': clean_name,
+                        'type': 'custom',
+                    }
+                )
+
+        voices.extend(custom_voices)
         return voices
 
 
