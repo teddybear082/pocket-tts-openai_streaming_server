@@ -10,9 +10,48 @@ document.addEventListener('DOMContentLoaded', async () => {
 	const audioPlayer = document.getElementById('audio-player');
 	const downloadBtn = document.getElementById('download-btn');
 	const streamToggle = document.getElementById('stream-toggle');
+	const formatSelect = document.getElementById('format-select');
 
 	let availableVoices = [];
 	let selectedVoiceId = null; // The actual value used for generation
+
+	// Format & Streaming Logic
+	function updateStreamingAvailability() {
+		const fmt = formatSelect.value;
+		// Server only supports streaming for PCM and WAV currently
+		const supportsStreaming = ['wav', 'pcm'].includes(fmt);
+		const infoLabel = document.getElementById('format-info');
+
+		if (supportsStreaming) {
+			streamToggle.disabled = false;
+			streamToggle.parentElement.title = '';
+
+			if (fmt === 'pcm') {
+				infoLabel.textContent =
+					"Streaming is available for Raw PCM. Note: This format creates a specialized raw stream that will not play in the browser's audio player.";
+			} else {
+				// WAV
+				infoLabel.textContent =
+					'Streaming is available for WAV. The server streams audio chunks for lower latency.';
+			}
+		} else {
+			streamToggle.disabled = true;
+			streamToggle.checked = false;
+			streamToggle.parentElement.title =
+				'Streaming is only available for WAV and PCM formats';
+
+			if (fmt === 'mp3') {
+				infoLabel.textContent =
+					'Streaming is not available for MP3 (Server limitation). A full file will be generated and played.';
+			} else {
+				infoLabel.textContent = 'Streaming is not available for this format.';
+			}
+		}
+	}
+
+	formatSelect.addEventListener('change', updateStreamingAvailability);
+	// Initialize state
+	updateStreamingAvailability();
 
 	// 1. Load Voices
 	async function loadVoices() {
@@ -393,6 +432,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 		// ... rest of generation logic ...
 		const stream = streamToggle.checked;
+		const fmt = formatSelect.value;
+
 		generateBtn.classList.add('loading');
 		generateBtn.disabled = true;
 		outputSection.classList.remove('active');
@@ -405,7 +446,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 					model: 'pocket-tts',
 					input: text,
 					voice: voice,
-					response_format: 'wav',
+					response_format: fmt,
 					stream: stream,
 				}),
 			});
@@ -422,8 +463,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 			const url = URL.createObjectURL(blob);
 			audioPlayer.src = url;
 			downloadBtn.href = url;
-			downloadBtn.download = 'generated_speech.wav';
-			audioPlayer.play();
+			downloadBtn.download = `generated_speech.${fmt}`;
+
+			// PCM raw audio usually won't play in standard <audio> elements
+			if (fmt !== 'pcm') {
+				audioPlayer
+					.play()
+					.catch((e) => console.warn('Auto-play blocked or failed:', e));
+			}
 			outputSection.classList.add('active');
 		} catch (e) {
 			alert('Error generating speech: ' + e.message);
