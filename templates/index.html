@@ -43,13 +43,66 @@ Hello! I am Pocket TTS, running locally on your machine. I can clone voices and 
 				</div>
 
 				<div class="control-group">
-					<label for="voice-select">Voice Selection</label>
-					<select id="voice-select">
-						<!-- Populated by JS -->
-						<option value="custom">
-							Custom (Upload .wav, .mp3, or .flac)...
-						</option>
-					</select>
+					<label for="voice-input">Voice Selection</label>
+					<div class="input-with-action">
+						<input
+							id="voice-input"
+							type="text"
+							autocomplete="off"
+							placeholder="Select a voice..."
+						/>
+						<button
+							type="button"
+							class="clear-btn"
+							id="voice-clear-btn"
+							aria-label="Clear voice search"
+						>
+							<svg
+								width="14"
+								height="14"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<line x1="18" y1="6" x2="6" y2="18"></line>
+								<line x1="6" y1="6" x2="18" y2="18"></line>
+							</svg>
+						</button>
+						<ul
+							id="voice-list"
+							class="voice-list"
+							aria-label="Available voices"
+						>
+							<!-- Populated by JS -->
+						</ul>
+					</div>
+					<div id="voice-id-display" class="voice-id-helper hidden">
+						ID: <span class="voice-id-text"></span>
+						<button
+							class="copy-btn"
+							id="voice-id-copy-btn"
+							title="Copy to clipboard"
+						>
+							<svg
+								width="12"
+								height="12"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+								<path
+									d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+								></path>
+							</svg>
+						</button>
+					</div>
 				</div>
 
 				<div class="control-group hidden" id="custom-voice-group">
@@ -57,6 +110,25 @@ Hello! I am Pocket TTS, running locally on your machine. I can clone voices and 
 						>Upload Reference Audio (WAV, MP3, FLAC)</label
 					>
 					<input type="file" id="voice-file" accept=".wav,.mp3,.flac" />
+				</div>
+
+				<div class="control-group">
+					<label for="format-select">Output Format</label>
+					<select
+						id="format-select"
+						style="
+							width: 100%;
+							padding: 8px;
+							border-radius: 4px;
+							border: 1px solid var(--border-color);
+							background: var(--input-bg);
+							color: var(--text-color);
+						"
+					>
+						<option value="mp3">MP3</option>
+						<option value="wav" selected>WAV</option>
+						<option value="pcm">PCM (Raw)</option>
+					</select>
 				</div>
 
 				<div class="control-group">
@@ -72,6 +144,15 @@ Hello! I am Pocket TTS, running locally on your machine. I can clone voices and 
 						/>
 						Enable Streaming Response
 					</label>
+					<p
+						id="format-info"
+						style="
+							font-size: 0.85em;
+							color: var(--text-secondary);
+							margin-top: 8px;
+							line-height: 1.4;
+						"
+					></p>
 				</div>
 
 				<button id="generate-btn" class="btn-primary">

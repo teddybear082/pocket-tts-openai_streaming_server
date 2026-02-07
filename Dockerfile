@@ -44,8 +44,8 @@ COPY --chown=pockettts:pockettts templates/ ./templates/
 COPY --chown=pockettts:pockettts voices/ ./voices/
 COPY --chown=pockettts:pockettts server.py ./
 
-# Create logs directory
-RUN mkdir -p /app/logs && chown pockettts:pockettts /app/logs
+# Create logs directory, and ensure app directory is owned by user
+RUN chown pockettts:pockettts /app && mkdir -p /app/logs && chown pockettts:pockettts /app/logs
 
 # Create HuggingFace cache directory (for volume mount)
 RUN mkdir -p /home/pockettts/.cache/huggingface && \
