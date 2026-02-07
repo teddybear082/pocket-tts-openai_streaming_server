@@ -39,9 +39,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 					type: 'manual',
 				});
 
-				// Default selection (Alba or first)
-				if (availableVoices.length > 0) {
-					selectVoice(availableVoices[0].id, false);
+				// Default selection: Prefer first non-custom voice
+				const defaultVoice = availableVoices.find((v) => v.id !== 'custom');
+				if (defaultVoice) {
+					selectVoice(defaultVoice.id, false);
 				}
 			}
 		} catch (e) {
@@ -86,7 +87,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 			const isDocker = window.POCKET_TTS_CONFIG?.isDocker || false;
 			if (isDocker) {
 				alert('Custom voices are not available in Docker mode.');
-				selectVoice(availableVoices[0].id || '');
+				// Fallback to the first non-custom voice if available
+				const fallbackVoice = availableVoices.find((v) => v.id !== 'custom');
+				if (fallbackVoice) {
+					selectVoice(fallbackVoice.id || '');
+				} else {
+					// No valid fallback; clear selection and hide custom UI
+					selectedVoiceId = null;
+					voiceInput.value = '';
+					voiceClearBtn.disabled = true;
+					customVoiceGroup.classList.add('hidden');
+				}
 				return;
 			}
 			customVoiceGroup.classList.remove('hidden');
@@ -214,7 +225,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 		// If user types, we conceptually deselect until they pick or we auto-match
 		// But strictly clearing selectedVoiceId might be annoying if they just made a typo.
 		// Let's keep selectedVoiceId as fallback, but filter.
-		const { count, firstId } = renderVoiceList(voiceInput.value);
+		renderVoiceList(voiceInput.value);
 		voiceList.classList.add('show');
 	});
 
@@ -356,13 +367,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 		if (!voice) {
 			// Try to find by name from input
 			const val = voiceInput.value.trim();
+			const isDocker = window.POCKET_TTS_CONFIG?.isDocker || false;
 			const match = availableVoices.find(
-				(v) => v.label === val || v.id === val,
+				(v) =>
+					(v.label === val || v.id === val) &&
+					// In Docker mode, do not allow resolving the special "custom" voice
+					!(isDocker && v.id === 'custom'),
 			);
 			if (match) voice = match.id;
 		}
 
 		if (!voice) return alert('Please choose a valid voice from the list');
+
+		const isDocker = window.POCKET_TTS_CONFIG?.isDocker || false;
+		if (isDocker && voice === 'custom') {
+			return alert(
+				'The custom voice is not available in Docker mode. Please choose another voice.',
+			);
+		}
 
 		if (voice === 'custom') {
 			voice = voiceFile.value.trim();
@@ -393,26 +415,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 				throw new Error(err.error || response.statusText);
 			}
 
-			if (stream) {
-				// Naive streaming playback (actually just fetch full blob for simpler player here,
-				// or use MediaSource if we want true streaming,
-				// but currently app.js just used blob. Let's start with blob for robustness)
-				// The server supports streaming, but native HTML5 audio src can just point to it?
-				// fetch() + blob is what was there.
-				const blob = await response.blob();
-				const url = URL.createObjectURL(blob);
-				audioPlayer.src = url;
-				downloadBtn.href = url;
-				downloadBtn.download = 'generated_speech.wav';
-				audioPlayer.play();
-			} else {
-				const blob = await response.blob();
-				const url = URL.createObjectURL(blob);
-				audioPlayer.src = url;
-				downloadBtn.href = url;
-				downloadBtn.download = 'generated_speech.wav';
-				audioPlayer.play();
-			}
+			// Currently we always fetch the full blob and play it once ready.
+			// The `stream` flag is still sent to the server, but client playback
+			// uses a single blob path for robustness.
+			const blob = await response.blob();
+			const url = URL.createObjectURL(blob);
+			audioPlayer.src = url;
+			downloadBtn.href = url;
+			downloadBtn.download = 'generated_speech.wav';
+			audioPlayer.play();
 			outputSection.classList.add('active');
 		} catch (e) {
 			alert('Error generating speech: ' + e.message);
