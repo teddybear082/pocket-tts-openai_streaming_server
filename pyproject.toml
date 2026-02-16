@@ -4,12 +4,12 @@ license = {text = "MIT"}
 name = "pocket-tts-openai-server"
 readme = "README.md"
 requires-python = ">=3.10"
-version = "2.2.0"
+version = "2.3.0"
 
 dependencies = [
   "flask>=3.0.0",
   "waitress>=3.0.0",
-  "pocket-tts>=1.0.0",
+  "pocket-tts>=1.1.0",
   "torch>=2.0.0,<=2.8.0",
   "torchaudio>=2.0.0,<=2.8.0",
   "scipy>=1.10.0",
