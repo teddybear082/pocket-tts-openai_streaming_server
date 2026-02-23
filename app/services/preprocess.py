@@ -5,8 +5,6 @@ See license at: https://github.com/KittenML/KittenTTS/blob/main/LICENSE (Apache 
 
 import re
 import unicodedata
-from typing import Optional
-
 
 # ─────────────────────────────────────────────
 # Number → Words conversion
@@ -91,7 +89,7 @@ def number_to_words(n: int) -> str:
             return f"{_ONES[hundreds]} hundred"
 
     parts = []
-    for i, scale in enumerate(_SCALE):
+    for _i, scale in enumerate(_SCALE):
         chunk = n % 1000
         if chunk:
             chunk_words = _three_digits_to_words(chunk)
@@ -187,7 +185,7 @@ _RE_PERCENT  = re.compile(r"(-?[\d,]+(?:\.\d+)?)\s*%")
 
 # Currency: $100, €1,200.50, £50, $85K, $2.5M (optional scale suffix)
 _RE_CURRENCY = re.compile(
-    r"([$€£¥₹₩₿])\s*([\d,]+(?:\.\d+)?)\s*(million|billion|trillion|thousand|[KMBT])?\b", 
+    r"([$€£¥₹₩₿])\s*([\d,]+(?:\.\d+)?)\s*(million|billion|trillion|thousand|[KMBT])?\b",
     re.IGNORECASE
 )
 
@@ -245,7 +243,7 @@ def expand_symbols(text: str) -> str:
     text = _RE_AMPERSAND.sub(" and ", text)
     text = _RE_AT_SYMBOL.sub(" at ", text)
     return text
-    
+
 def _ordinal_suffix(n: int) -> str:
     """Return the ordinal word for n (e.g. 1 → 'first', 5 → 'fifth', 21 → 'twenty-first')."""
     word = number_to_words(n)
@@ -328,7 +326,7 @@ def expand_currency(text: str) -> str:
     def _replace(m: re.Match) -> str:
         symbol = m.group(1)
         raw = m.group(2).replace(",", "")
-        scale_suffix = m.group(3) 
+        scale_suffix = m.group(3)
         unit = _CURRENCY_SYMBOLS.get(symbol, "")
 
         # Handle Scaled Currency ($17.5 billion or $17.5B)
@@ -650,10 +648,10 @@ def expand_months(text: str) -> str:
 
     # 1. Standard abbreviations
     text = _RE_MONTHS.sub(_replace, text)
-    
+
     # 2. May (Special case: only if followed by a digit)
     text = _RE_MAY.sub("May", text) # Essentially just ensuring it's treated as a word
-    
+
     return text
 
 # ─────────────────────────────────────────────
@@ -761,7 +759,7 @@ def expand_contractions(text: str) -> str:
     return text
 
 
-def remove_stopwords(text: str, stopwords: Optional[set] = None) -> str:
+def remove_stopwords(text: str, stopwords: set | None = None) -> str:
     """
     Remove stopwords from text.
 
@@ -833,7 +831,7 @@ class TextPreprocessor:
         remove_mentions: bool = False,
         remove_punctuation: bool = True,
         remove_stopwords: bool = False,
-        stopwords: Optional[set] = None,
+        stopwords: set | None = None,
         normalize_unicode: bool = True,
         remove_accents: bool = False,
         remove_extra_whitespace: bool = True,
