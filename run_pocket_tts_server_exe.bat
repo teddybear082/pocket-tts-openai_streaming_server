@@ -61,6 +61,16 @@ set "TEXT_PREPROCESS_ARG=--text-preprocess"
 set /p "INPUT_PREPROCESS=Enable Text Preprocessing? (Y/N) [Y]: "
 if /i "%INPUT_PREPROCESS%"=="N" set "TEXT_PREPROCESS_ARG="
 
+:: 7. Language
+set "LANGUAGE_ARG="
+set /p "INPUT_LANGUAGE=Language (english, french_24l, german_24l, portuguese, italian, spanish_24l - leave blank for default): "
+if not "%INPUT_LANGUAGE%"=="" set "LANGUAGE_ARG=--language %INPUT_LANGUAGE%"
+
+:: 8. Quantization
+set "QUANTIZE_ARG="
+set /p "INPUT_QUANTIZE=Enable int8 Quantization? (Y/N) [N]: "
+if /i "%INPUT_QUANTIZE%"=="Y" set "QUANTIZE_ARG=--quantize"
+
 echo.
 echo ========================================================
 echo Starting Pocket TTS Server (EXE)...
@@ -70,12 +80,14 @@ if defined MODEL_PATH echo Model: %MODEL_PATH%
 if defined VOICES_DIR (echo Voices: %VOICES_DIR%) else (echo Voices: Default/None)
 if defined STREAM_ARG (echo Streaming: Enabled) else (echo Streaming: Disabled)
 if defined TEXT_PREPROCESS_ARG (echo Text Preprocessing: Enabled) else (echo Text Preprocessing: Disabled)
+if defined LANGUAGE_ARG echo Language: %INPUT_LANGUAGE%
+if defined QUANTIZE_ARG echo Quantization: Enabled
 echo ========================================================
 echo.
 
-:: 7. Run Command
+:: 9. Run Command
 if exist "%~dp0PocketTTS-Server.exe" (
-    "%~dp0PocketTTS-Server.exe" --host %HOST% --port %PORT% %MODEL_PATH% %VOICES_DIR% %STREAM_ARG% %TEXT_PREPROCESS_ARG%
+    "%~dp0PocketTTS-Server.exe" --host %HOST% --port %PORT% %MODEL_PATH% %VOICES_DIR% %STREAM_ARG% %TEXT_PREPROCESS_ARG% %LANGUAGE_ARG% %QUANTIZE_ARG%
 ) else (
     echo [ERROR] PocketTTS-Server.exe not found in the current directory.
     echo Please make sure the executable is located in: %~dp0

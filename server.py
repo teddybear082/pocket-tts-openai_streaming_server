@@ -34,13 +34,15 @@ Examples:
     # Custom port and voices directory
     python server.py --port 8080 --voices-dir ./my_voices
 
-    # Enable streaming by default
-    python server.py --stream
+    # Load French model with quantization
+    python server.py --language french_24l --quantize
 
 Environment Variables:
     POCKET_TTS_HOST         Server host (default: 0.0.0.0)
     POCKET_TTS_PORT         Server port (default: 49112)
-    POCKET_TTS_MODEL_PATH   Path to model file
+    POCKET_TTS_MODEL_PATH   Path to model config file
+    POCKET_TTS_LANGUAGE     Model language (e.g., english, french_24l)
+    POCKET_TTS_QUANTIZE     Enable int8 quantization (default: false)
     POCKET_TTS_VOICES_DIR   Path to voices directory
     POCKET_TTS_STREAM_DEFAULT Enable streaming by default
     POCKET_TTS_TEXT_PREPROCESS_DEFAULT Enable text preprocessing by default
@@ -81,6 +83,19 @@ Environment Variables:
         help='Enable text preprocessing for all requests',
     )
     parser.add_argument(
+        '--language',
+        type=str,
+        default=Config.LANGUAGE,
+        dest='language',
+        help='Model language (e.g., english, french_24l, german_24l, portuguese, italian, spanish_24l). Incompatible with --model-path.',
+    )
+    parser.add_argument(
+        '--quantize',
+        action='store_true',
+        default=Config.QUANTIZE,
+        help='Apply dynamic int8 quantization to reduce memory usage and improve speed.',
+    )
+    parser.add_argument(
         '--log-level',
         type=str,
         default=Config.LOG_LEVEL,
@@ -106,9 +121,19 @@ def main():
 
     logger = get_logger()
 
+    # Validate mutually exclusive options
+    if args.language and args.model_path:
+        logger.error('--language and --model-path are mutually exclusive. Use one or the other.')
+        sys.exit(1)
+
     # Initialize TTS service
     try:
-        init_tts_service(model_path=args.model_path, voices_dir=args.voices_dir)
+        init_tts_service(
+            model_path=args.model_path,
+            voices_dir=args.voices_dir,
+            language=args.language,
+            quantize=args.quantize,
+        )
     except Exception as e:
         logger.error(f'Failed to initialize TTS service: {e}')
         sys.exit(1)

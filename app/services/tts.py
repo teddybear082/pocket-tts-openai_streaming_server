@@ -61,12 +61,20 @@ class TTSService:
             return str(self.model.device)
         return 'unknown'
 
-    def load_model(self, model_path: str | None = None) -> None:
+    def load_model(
+        self,
+        model_path: str | None = None,
+        language: str | None = None,
+        quantize: bool = False,
+    ) -> None:
         """
         Load the TTS model.
 
         Args:
-            model_path: Optional path to model file or variant name
+            model_path: Optional path to model config file (.yaml)
+            language: Optional language identifier (e.g., english, french_24l).
+                      Incompatible with model_path.
+            quantize: If True, apply dynamic int8 quantization to reduce memory.
         """
         _ensure_pocket_tts()
 
@@ -86,10 +94,13 @@ class TTSService:
         try:
             if effective_path:
                 logger.info(f'Loading model from: {effective_path}')
-                self.model = TTSModel.load_model(config=effective_path)
+                self.model = TTSModel.load_model(config=effective_path, quantize=quantize)
+            elif language:
+                logger.info(f'Loading model with language: {language}')
+                self.model = TTSModel.load_model(language=language, quantize=quantize)
             else:
                 logger.info('Loading default model from HuggingFace...')
-                self.model = TTSModel.load_model()
+                self.model = TTSModel.load_model(quantize=quantize)
 
             self._model_loaded = True
             load_time = time.time() - t0

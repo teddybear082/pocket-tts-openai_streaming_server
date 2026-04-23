@@ -25,6 +25,11 @@ services:
       - POCKET_TTS_VOICES_DIR=/app/voices
       - POCKET_TTS_LOG_LEVEL=${POCKET_TTS_LOG_LEVEL:-INFO}
       - POCKET_TTS_STREAM_DEFAULT=${POCKET_TTS_STREAM_DEFAULT:-true}
+      # Model language (e.g., english, french_24l, german_24l, portuguese, italian, spanish_24l)
+      # Mutually exclusive with POCKET_TTS_MODEL_PATH. Requires pocket-tts>=2.0.0.
+      - POCKET_TTS_LANGUAGE=${POCKET_TTS_LANGUAGE:-}
+      # Enable int8 quantization for lower memory usage and improved speed
+      - POCKET_TTS_QUANTIZE=${POCKET_TTS_QUANTIZE:-false}
       # Hugging Face token for voice cloning (optional)
       - HF_TOKEN=${HF_TOKEN:-}
 

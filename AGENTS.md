@@ -53,15 +53,21 @@ server.py                    # Entry point, CLI, starts Waitress
 }
 ```
 
-## Configuration (Environment Variables)
+## CLI Arguments
 
-| Variable                    | Default   | Purpose            |
-| --------------------------- | --------- | ------------------ |
-| `POCKET_TTS_HOST`           | `0.0.0.0` | Bind address       |
-| `POCKET_TTS_PORT`           | `49112`   | Port               |
-| `POCKET_TTS_VOICES_DIR`     | None      | Custom voices path |
-| `POCKET_TTS_STREAM_DEFAULT` | `true`    | Default streaming  |
-| `POCKET_TTS_LOG_LEVEL`      | `INFO`    | Log verbosity      |
+| Argument               | Env Variable               | Default | Purpose                                         |
+| ---------------------  | --------------------------- | ------- | ------------------                              |
+| `--host`               | `POCKET_TTS_HOST`          | `0.0.0.0` | Bind address                                    |
+| `--port`               | `POCKET_TTS_PORT`          | `49112`   | Port                                            |
+| `--model-path`         | `POCKET_TTS_MODEL_PATH`    | None    | Path to model config file (.yaml) or variant     |
+| `--language`           | `POCKET_TTS_LANGUAGE`      | None    | Model language (english, french_24l, etc.)       |
+| `--quantize`           | `POCKET_TTS_QUANTIZE`      | `false` | Enable int8 quantization for lower memory usage  |
+| `--voices-dir`         | `POCKET_TTS_VOICES_DIR`    | None    | Custom voices directory                          |
+| `--stream`             | `POCKET_TTS_STREAM_DEFAULT`| `false` | Enable streaming by default                      |
+| `--text-preprocess`    | `POCKET_TTS_TEXT_PREPROCESS_DEFAULT` | `false` | Enable text preprocessing by default |
+| `--log-level`          | `POCKET_TTS_LOG_LEVEL`     | `INFO`  | Log verbosity                                    |
+
+**Note**: `--language` and `--model-path` are mutually exclusive. Use `--language` to select a built-in language model (requires pocket-tts>=2.0.0).
 
 ## Voice Resolution Order
 
@@ -79,8 +85,11 @@ server.py                    # Entry point, CLI, starts Waitress
 # Install
 pip install -r requirements.txt
 
-# Run
+# Run with defaults (English model)
 python server.py --log-level DEBUG
+
+# Run with French model and quantization
+python server.py --language french_24l --quantize --log-level DEBUG
 
 # Test
 curl http://localhost:49112/health

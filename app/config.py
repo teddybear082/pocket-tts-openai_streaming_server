@@ -33,6 +33,8 @@ class Config:
 
     # Model settings
     MODEL_PATH = os.environ.get('POCKET_TTS_MODEL_PATH', None)
+    LANGUAGE = os.environ.get('POCKET_TTS_LANGUAGE', None)
+    QUANTIZE = os.environ.get('POCKET_TTS_QUANTIZE', 'false').lower() == 'true'
     DEFAULT_VOICE = os.environ.get(
         'POCKET_TTS_DEFAULT_VOICE', 'hf://kyutai/tts-voices/alba-mackenna/casual.wav'
     )
