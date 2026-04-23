@@ -48,13 +48,20 @@ def create_app(config_overrides: dict = None) -> Flask:
     return app
 
 
-def init_tts_service(model_path: str = None, voices_dir: str = None) -> None:
+def init_tts_service(
+    model_path: str = None,
+    voices_dir: str = None,
+    language: str = None,
+    quantize: bool = False,
+) -> None:
     """
     Initialize the TTS service with model and voices.
 
     Args:
-        model_path: Optional path to model file
+        model_path: Optional path to model config file
         voices_dir: Optional path to voices directory
+        language: Optional language identifier (e.g., english, french_24l)
+        quantize: Whether to apply dynamic int8 quantization
     """
     from app.services.tts import get_tts_service
 
@@ -62,7 +69,7 @@ def init_tts_service(model_path: str = None, voices_dir: str = None) -> None:
     tts = get_tts_service()
 
     # Load model
-    tts.load_model(model_path)
+    tts.load_model(model_path=model_path, language=language, quantize=quantize)
 
     # Set voices directory
     if voices_dir:
