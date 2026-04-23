@@ -123,7 +123,7 @@ def main():
 
     # Validate mutually exclusive options
     if args.language and args.model_path:
-        logger.error("--language and --model-path are mutually exclusive. Use one or the other.")
+        logger.error('--language and --model-path are mutually exclusive. Use one or the other.')
         sys.exit(1)
 
     # Initialize TTS service
