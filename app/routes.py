@@ -128,6 +128,40 @@ def get_model():
     })
 
 
+@api.route('/v1/model', methods=['POST'])
+def post_model():
+    """Request a runtime model switch. Returns 202; UI polls GET for completion."""
+    data = request.json or {}
+    language = data.get('language')
+    quantize = bool(data.get('quantize', False))
+
+    if not language:
+        return jsonify({'error': "Missing required field 'language'"}), 400
+
+    if language not in Config.SUPPORTED_LANGUAGES:
+        return jsonify({
+            'error': f"Unknown language: '{language}'",
+            'available': list(Config.SUPPORTED_LANGUAGES),
+        }), 400
+
+    tts = get_tts_service()
+
+    if tts._boot_active and tts._boot_active.get('source') == 'model_path':
+        return jsonify({
+            'error': 'Language switching disabled: server started with --model-path.',
+        }), 403
+
+    if tts._loading:
+        return jsonify({'error': 'A model reload is already in progress.'}), 409
+
+    tts.reload_model_async(language=language, quantize=quantize)
+
+    return jsonify({
+        'status': 'accepted',
+        'loading_target': {'value': language, 'quantize': quantize},
+    }), 202
+
+
 @api.route('/v1/audio/speech', methods=['POST'])
 def generate_speech():
     """

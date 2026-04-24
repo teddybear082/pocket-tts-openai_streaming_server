@@ -50,6 +50,8 @@ class TTSService:
         self._loading = False  # fast-path flag; read without lock
         self._active: dict | None = None
         self._boot_active: dict | None = None
+        self._loading_target: dict | None = None
+        self._last_reload_error: str | None = None
 
         from pathlib import Path
         self.cache_dir: Path | None = Path(Config.VOICE_CACHE_DIR)
@@ -197,6 +199,24 @@ class TTSService:
                     raise
         finally:
             self._loading = False
+
+    def reload_model_async(self, language: str, quantize: bool) -> None:
+        """Kick off `reload_model` on a daemon thread. Fire-and-forget."""
+        import threading
+
+        self._loading_target = {'value': language, 'quantize': quantize}
+        self._last_reload_error = None
+
+        def _worker():
+            try:
+                self.reload_model(language=language, quantize=quantize)
+            except Exception as e:
+                self._last_reload_error = f'{type(e).__name__}: {e}'
+                logger.error(f'Reload failed: {self._last_reload_error}')
+            finally:
+                self._loading_target = None
+
+        threading.Thread(target=_worker, daemon=True, name='tts-reload').start()
 
     def set_voices_dir(self, voices_dir: str | None) -> None:
         """
