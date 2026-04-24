@@ -146,6 +146,39 @@ class TTSService:
             logger.error(f'Failed to load model: {e}')
             raise
 
+    def reload_model(self, language: str, quantize: bool) -> None:
+        """Reload the model with a new language / quantize setting.
+
+        Blocks until any in-flight generation finishes. Serialized via the
+        single TTSService lock (pocket-tts v2 TTSModel is not thread-safe).
+        """
+        if self._boot_active and self._boot_active['source'] == 'model_path':
+            raise RuntimeError(
+                'Cannot switch language: server was started with a custom model_path.'
+            )
+
+        if language not in Config.SUPPORTED_LANGUAGES:
+            raise ValueError(f'Unsupported language: {language!r}')
+
+        if self._loading:
+            raise RuntimeError('already loading')
+
+        self._loading = True
+        try:
+            with self._lock:
+                previous_model = self.model
+                previous_active = self._active
+                try:
+                    self.load_model(language=language, quantize=quantize, _is_boot=False)
+                    self.voice_cache.clear()
+                except Exception:
+                    # Restore previous state on failure so the server remains usable.
+                    self.model = previous_model
+                    self._active = previous_active
+                    raise
+        finally:
+            self._loading = False
+
     def set_voices_dir(self, voices_dir: str | None) -> None:
         """
         Set the directory for custom voice files.

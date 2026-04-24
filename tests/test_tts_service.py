@@ -129,3 +129,70 @@ def test_resolve_voice_path_uses_active_model(_ensure, tmp_path, monkeypatch, mo
 
     resolved = service._resolve_voice_path('emma')
     assert resolved == str(cache / 'emma.german_24l.safetensors')
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_reload_model_swaps_and_clears_voice_cache(_ensure, service, mock_tts_model):
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+        service.voice_cache['stale'] = {'fake': 'state'}
+
+        new_model = MagicMock()
+        new_model.sample_rate = 24000
+        new_model.device = 'cpu'
+        MockModel.load_model.return_value = new_model
+        service.reload_model(language='german_24l', quantize=True)
+
+    assert service.model is new_model
+    assert service.voice_cache == {}
+    assert service._active['value'] == 'german_24l'
+    assert service._active['quantize'] is True
+    assert service._boot_active['value'] == 'english'  # unchanged
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_reload_model_rejects_if_boot_used_model_path(_ensure, service, mock_tts_model):
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(model_path='/custom/x.yaml', quantize=False)
+
+    with pytest.raises(RuntimeError, match='model_path'):
+        service.reload_model(language='german_24l', quantize=False)
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_reload_model_rejects_unknown_language(_ensure, service, mock_tts_model):
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    with pytest.raises(ValueError, match='klingon'):
+        service.reload_model(language='klingon', quantize=False)
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_reload_model_rejects_if_already_loading(_ensure, service, mock_tts_model):
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    service._loading = True
+    with pytest.raises(RuntimeError, match='already loading'):
+        service.reload_model(language='german_24l', quantize=False)
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_reload_model_restores_previous_on_failure(_ensure, service, mock_tts_model):
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+        original_model = service.model
+
+        MockModel.load_model.side_effect = RuntimeError('weights corrupted')
+        with pytest.raises(RuntimeError, match='weights corrupted'):
+            service.reload_model(language='german_24l', quantize=False)
+
+    assert service.model is original_model
+    assert service._active['value'] == 'english'
+    assert service._loading is False
