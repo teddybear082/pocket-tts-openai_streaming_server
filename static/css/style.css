@@ -639,6 +639,120 @@ audio {
 	color: var(--text-color);
 }
 
+.model-settings {
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg);
+}
+
+.model-settings-summary {
+    padding: 10px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    list-style: none;
+}
+
+.model-settings-summary::-webkit-details-marker {
+    display: none;
+}
+
+.disclosure-caret {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    color: var(--text-secondary);
+}
+
+.model-settings[open] .disclosure-caret {
+    transform: rotate(90deg);
+}
+
+.summary-label #active-model-label {
+    font-family: monospace;
+    color: var(--text-color);
+}
+
+.model-badge {
+    font-size: 0.75em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--border-color);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.session-badge {
+    background: #b45309;
+    color: #fff;
+}
+
+.loading-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+}
+
+.spinner-small {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--text-color);
+    border-radius: 50%;
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+}
+
+.model-settings-body {
+    padding: 0 14px 14px 14px;
+    border-top: 1px solid var(--border-color);
+}
+
+.inline-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.info-banner {
+    padding: 10px 12px;
+    border-radius: 4px;
+    margin-top: 10px;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.info-banner code {
+    font-family: monospace;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 4px;
+    border-radius: 2px;
+}
+
+.info-banner.info {
+    background: rgba(59,130,246,0.08);
+    border-left: 3px solid #3b82f6;
+    color: var(--text-color);
+}
+
+.info-banner.warning {
+    background: rgba(234,179,8,0.08);
+    border-left: 3px solid #eab308;
+    color: var(--text-color);
+}
+
+.info-banner.error {
+    background: rgba(239,68,68,0.08);
+    border-left: 3px solid #ef4444;
+    color: var(--text-color);
+}
+
 /* Responsive adjustments */
 @media (max-width: 600px) {
 	.params-table {
