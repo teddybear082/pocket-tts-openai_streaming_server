@@ -50,7 +50,11 @@ def home():
     """Serve the web interface."""
     from app.config import Config
 
-    return render_template('index.html', is_docker=Config.IS_DOCKER)
+    return render_template(
+        'index.html',
+        is_docker=Config.IS_DOCKER,
+        versions=get_versions(),
+    )
 
 
 @api.route('/health', methods=['GET'])
@@ -73,6 +77,7 @@ def health():
             'sample_rate': tts.sample_rate if tts.is_loaded else None,
             'voices_dir': tts.voices_dir,
             'voice_check': {'valid': voice_valid, 'message': voice_msg},
+            'active_model': tts._active,
         }
     ), 200 if tts.is_loaded else 503
 

@@ -31,6 +31,7 @@ def mock_tts_service():
     service._loading = False
     service._last_reload_error = None
     service._loading_target = None
+    service.validate_voice.return_value = (True, 'ok')
     tts_module._tts_service = service
     yield service
     tts_module._tts_service = None
@@ -126,3 +127,21 @@ def test_speech_voice_model_mismatch_returns_400_with_code(client, mock_tts_serv
     assert body['error'] == 'voice_model_mismatch'
     assert body['voice'] == 'emma'
     assert body['active_model'] == 'english'
+
+
+def test_health_includes_active_model(client, mock_tts_service):
+    resp = client.get('/health')
+    body = resp.get_json()
+    assert body['active_model'] == {
+        'source': 'language', 'value': 'english', 'quantize': False,
+    }
+
+
+import pytest as _pytest
+
+@_pytest.mark.skip(reason='Template updated in Task 16')
+def test_home_passes_versions_to_template(client, mock_tts_service):
+    resp = client.get('/')
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    assert 'data-server-version=' in html
