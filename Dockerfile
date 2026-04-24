@@ -51,6 +51,9 @@ RUN chown pockettts:pockettts /app && mkdir -p /app/logs && chown pockettts:pock
 RUN mkdir -p /home/pockettts/.cache/huggingface && \
     chown -R pockettts:pockettts /home/pockettts/.cache
 
+# Create voice cache directory with correct ownership for the named volume
+RUN mkdir -p /app/voice_cache && chown pockettts:pockettts /app/voice_cache
+
 # Switch to non-root user
 USER pockettts
 

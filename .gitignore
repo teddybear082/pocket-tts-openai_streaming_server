@@ -185,3 +185,5 @@ cython_debug/
 .cursorindexingignore
 
 .DS_Store
+
+voice_cache/
