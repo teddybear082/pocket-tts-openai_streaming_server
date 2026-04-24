@@ -119,18 +119,20 @@ def get_model():
     model_path_locked = boot.get('source') == 'model_path'
     versions = get_versions()
 
-    return jsonify({
-        'active': active,
-        'boot': boot,
-        'differs_from_boot': differs,
-        'loading': tts._loading,
-        'loading_target': getattr(tts, '_loading_target', None),
-        'last_error': getattr(tts, '_last_reload_error', None),
-        'model_path_locked': model_path_locked,
-        'available_languages': list(Config.SUPPORTED_LANGUAGES),
-        'server_version': versions['server'],
-        'pocket_tts_version': versions['pocket_tts'],
-    })
+    return jsonify(
+        {
+            'active': active,
+            'boot': boot,
+            'differs_from_boot': differs,
+            'loading': tts._loading,
+            'loading_target': getattr(tts, '_loading_target', None),
+            'last_error': getattr(tts, '_last_reload_error', None),
+            'model_path_locked': model_path_locked,
+            'available_languages': list(Config.SUPPORTED_LANGUAGES),
+            'server_version': versions['server'],
+            'pocket_tts_version': versions['pocket_tts'],
+        }
+    )
 
 
 @api.route('/v1/model', methods=['POST'])
@@ -144,27 +146,33 @@ def post_model():
         return jsonify({'error': "Missing required field 'language'"}), 400
 
     if language not in Config.SUPPORTED_LANGUAGES:
-        return jsonify({
-            'error': f"Unknown language: '{language}'",
-            'available': list(Config.SUPPORTED_LANGUAGES),
-        }), 400
+        return jsonify(
+            {
+                'error': f"Unknown language: '{language}'",
+                'available': list(Config.SUPPORTED_LANGUAGES),
+            }
+        ), 400
 
     tts = get_tts_service()
 
     if tts._boot_active and tts._boot_active.get('source') == 'model_path':
-        return jsonify({
-            'error': 'Language switching disabled: server started with --model-path.',
-        }), 403
+        return jsonify(
+            {
+                'error': 'Language switching disabled: server started with --model-path.',
+            }
+        ), 403
 
     if tts._loading:
         return jsonify({'error': 'A model reload is already in progress.'}), 409
 
     tts.reload_model_async(language=language, quantize=quantize)
 
-    return jsonify({
-        'status': 'accepted',
-        'loading_target': {'value': language, 'quantize': quantize},
-    }), 202
+    return jsonify(
+        {
+            'status': 'accepted',
+            'loading_target': {'value': language, 'quantize': quantize},
+        }
+    ), 202
 
 
 @api.route('/v1/audio/speech', methods=['POST'])
@@ -245,22 +253,23 @@ def generate_speech():
         # Detect the legacy-unlabeled-safetensors mismatch pattern.
         resolved = tts._resolve_voice_path(voice) if not tts._loading else ''
         is_legacy_st = resolved.endswith('.safetensors') and not any(
-            resolved.endswith(f'.{tag}.safetensors')
-            for tag in Config.SUPPORTED_LANGUAGES
+            resolved.endswith(f'.{tag}.safetensors') for tag in Config.SUPPORTED_LANGUAGES
         )
         mismatch_markers = ('size mismatch', 'Error(s) in loading state_dict', 'shape')
         if is_legacy_st and any(m in msg for m in mismatch_markers):
-            return jsonify({
-                'error': 'voice_model_mismatch',
-                'message': (
-                    f"Voice '{voice}' appears to have been cloned for a different "
-                    f"model. Upload the original audio (.wav/.mp3/.flac) to "
-                    f"re-clone for the active model, or switch to the model it "
-                    f"was generated for."
-                ),
-                'voice': voice,
-                'active_model': (tts._active or {}).get('value'),
-            }), 400
+            return jsonify(
+                {
+                    'error': 'voice_model_mismatch',
+                    'message': (
+                        f"Voice '{voice}' appears to have been cloned for a different "
+                        f'model. Upload the original audio (.wav/.mp3/.flac) to '
+                        f're-clone for the active model, or switch to the model it '
+                        f'was generated for.'
+                    ),
+                    'voice': voice,
+                    'active_model': (tts._active or {}).get('value'),
+                }
+            ), 400
 
         logger.warning(f'Voice loading failed: {e}')
         return jsonify({'error': msg}), 400

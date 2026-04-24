@@ -13,6 +13,7 @@ def test_get_versions_returns_both():
 
 def test_get_versions_handles_missing_package():
     from importlib.metadata import PackageNotFoundError
+
     get_versions.cache_clear()
     with patch('app.services.versions.version', side_effect=PackageNotFoundError):
         result = get_versions()

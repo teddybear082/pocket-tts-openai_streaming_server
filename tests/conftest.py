@@ -1,7 +1,5 @@
 """Shared pytest fixtures."""
 
-import shutil
-import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -28,6 +26,7 @@ def tmp_cache(tmp_path: Path) -> Path:
 def reset_tts_singleton():
     """Reset the TTSService singleton between tests."""
     import app.services.tts as tts_module
+
     tts_module._tts_service = None
     yield
     tts_module._tts_service = None

@@ -1,6 +1,6 @@
 """Tests for /v1/model routes."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -21,6 +21,7 @@ def client(app):
 def mock_tts_service():
     """Install a mock TTSService for route tests."""
     import app.services.tts as tts_module
+
     service = MagicMock()
     service.is_loaded = True
     service.sample_rate = 24000
@@ -71,7 +72,8 @@ def test_post_model_returns_202_and_starts_load(client, mock_tts_service):
     body = resp.get_json()
     assert body['loading_target'] == {'value': 'german_24l', 'quantize': True}
     mock_tts_service.reload_model_async.assert_called_once_with(
-        language='german_24l', quantize=True,
+        language='german_24l',
+        quantize=True,
     )
 
 
@@ -133,11 +135,11 @@ def test_health_includes_active_model(client, mock_tts_service):
     resp = client.get('/health')
     body = resp.get_json()
     assert body['active_model'] == {
-        'source': 'language', 'value': 'english', 'quantize': False,
+        'source': 'language',
+        'value': 'english',
+        'quantize': False,
     }
 
-
-import pytest as _pytest
 
 def test_home_passes_versions_to_template(client, mock_tts_service):
     resp = client.get('/')

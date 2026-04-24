@@ -53,7 +53,6 @@ class TTSService:
         self._loading_target: dict | None = None
         self._last_reload_error: str | None = None
 
-        from pathlib import Path
         self.cache_dir: Path | None = Path(Config.VOICE_CACHE_DIR)
 
     def _ensure_cache_dir(self) -> None:
@@ -71,7 +70,6 @@ class TTSService:
 
     def _save_cloned_state(self, state: dict, audio_path) -> None:
         """Persist a freshly-cloned state as <stem>.<active_tag>.safetensors."""
-        from pathlib import Path
 
         from app.services.voice_cache import active_model_tag
 
@@ -241,7 +239,6 @@ class TTSService:
         and persist the result as <stem>.<active_tag>.safetensors in cache_dir.
         If a tagged cache exists but its source audio is newer, regenerate.
         """
-        from pathlib import Path
 
         from app.services.voice_cache import (
             AUDIO_EXTENSIONS,
@@ -304,7 +301,6 @@ class TTSService:
 
         Raises ValueError on unsafe URL schemes (retained from previous behavior).
         """
-        from pathlib import Path
 
         from app.services.voice_cache import resolve_voice_path
 
@@ -403,7 +399,6 @@ class TTSService:
 
     def list_voices(self) -> list[dict]:
         """List built-in voices and custom voices (one entry per stem)."""
-        from pathlib import Path
 
         from app.services.voice_cache import list_voice_stems
 

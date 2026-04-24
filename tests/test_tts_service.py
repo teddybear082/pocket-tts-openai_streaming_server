@@ -14,6 +14,7 @@ def service():
 
 def test_service_has_lock_and_flag_on_init(service):
     import threading
+
     # threading.Lock() returns a _thread.lock instance; check via acquire/release protocol
     assert isinstance(service._lock, type(threading.Lock()))
     assert service._loading is False
@@ -79,9 +80,6 @@ def test_load_model_default_has_default_source(_ensure, service, mock_tts_model)
     assert service._active['value'] is None
 
 
-from pathlib import Path
-
-
 def test_service_initializes_cache_dir(tmp_path, monkeypatch):
     cache = tmp_path / 'voice_cache'
     monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
@@ -101,6 +99,7 @@ def test_service_cache_dir_mkdir_on_first_save(tmp_path, monkeypatch):
 def test_service_cache_dir_read_only_is_tolerated(tmp_path, monkeypatch, caplog):
     """If mkdir raises (read-only FS), log and disable caching."""
     import os
+
     ro_parent = tmp_path / 'ro'
     ro_parent.mkdir()
     os.chmod(ro_parent, 0o500)  # r-x, not writable
@@ -236,8 +235,12 @@ def test_get_voice_state_saves_clone_to_cache(_ensure, tmp_path, monkeypatch, mo
 
 
 @patch('app.services.tts._ensure_pocket_tts')
-def test_get_voice_state_regenerates_when_source_newer(_ensure, tmp_path, monkeypatch, mock_tts_model):
-    import os, time
+def test_get_voice_state_regenerates_when_source_newer(
+    _ensure, tmp_path, monkeypatch, mock_tts_model
+):
+    import os
+    import time
+
     voices = tmp_path / 'voices'
     voices.mkdir()
     cache = tmp_path / 'voice_cache'

@@ -130,7 +130,7 @@ def main():
     if args.language and args.language not in Config.SUPPORTED_LANGUAGES:
         logger.error(
             f"Unknown language '{args.language}'. "
-            f"Supported: {', '.join(Config.SUPPORTED_LANGUAGES)}"
+            f'Supported: {", ".join(Config.SUPPORTED_LANGUAGES)}'
         )
         sys.exit(1)
 

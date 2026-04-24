@@ -8,12 +8,18 @@ from app.config import Config
 def test_supported_languages_contains_all_yaml_configs():
     """All 12 language YAMLs from pocket-tts v2.0.0 must be listed."""
     expected = {
-        'english', 'english_2026-01', 'english_2026-04',
+        'english',
+        'english_2026-01',
+        'english_2026-04',
         'french_24l',
-        'german', 'german_24l',
-        'italian', 'italian_24l',
-        'portuguese', 'portuguese_24l',
-        'spanish', 'spanish_24l',
+        'german',
+        'german_24l',
+        'italian',
+        'italian_24l',
+        'portuguese',
+        'portuguese_24l',
+        'spanish',
+        'spanish_24l',
     }
     assert set(Config.SUPPORTED_LANGUAGES) == expected
 
