@@ -4,10 +4,7 @@ TTS Service - handles model loading, voice management, and audio generation.
 
 import os
 import time
-from collections.abc import Iterator
 from pathlib import Path
-
-import torch
 
 from app.config import Config
 from app.logging_config import get_logger
@@ -16,16 +13,19 @@ logger = get_logger('tts')
 
 # Lazy import pocket_tts to allow for better error handling
 TTSModel = None
+export_model_state = None
 
 
 def _ensure_pocket_tts():
     """Ensure pocket-tts is imported."""
-    global TTSModel
+    global TTSModel, export_model_state
     if TTSModel is None:
         try:
             from pocket_tts import TTSModel as _TTSModel
+            from pocket_tts.models.tts_model import export_model_state as _export_state
 
             TTSModel = _TTSModel
+            export_model_state = _export_state
         except ImportError as exc:
             raise ImportError('pocket-tts not found. Install with: pip install pocket-tts') from exc
 
@@ -66,6 +66,25 @@ class TTSService:
                 f'cache persistence disabled.'
             )
             self.cache_dir = None
+
+    def _save_cloned_state(self, state: dict, audio_path) -> None:
+        """Persist a freshly-cloned state as <stem>.<active_tag>.safetensors."""
+        from pathlib import Path
+
+        from app.services.voice_cache import active_model_tag
+
+        self._ensure_cache_dir()
+        if self.cache_dir is None:
+            return
+
+        audio_path = Path(audio_path)
+        tag = active_model_tag((self._active or {}).get('value') or 'english')
+        target = self.cache_dir / f'{audio_path.stem}.{tag}.safetensors'
+        try:
+            export_model_state(state, target)
+            logger.info(f'Saved cloned voice state to {target}')
+        except OSError as e:
+            logger.warning(f'Could not save voice cache to {target}: {e}')
 
     @property
     def is_loaded(self) -> bool:
@@ -196,36 +215,62 @@ class TTSService:
             self.voices_dir = None
 
     def get_voice_state(self, voice_id_or_path: str) -> dict:
+        """Resolve a voice ID to a cached model state.
+
+        When the resolved path is raw audio, encode it against the active model
+        and persist the result as <stem>.<active_tag>.safetensors in cache_dir.
+        If a tagged cache exists but its source audio is newer, regenerate.
         """
-        Resolve voice ID to a model state with caching.
+        from pathlib import Path
 
-        Args:
-            voice_id_or_path: Voice identifier (name, file path, or URL)
+        from app.services.voice_cache import (
+            AUDIO_EXTENSIONS,
+            cache_is_stale,
+        )
 
-        Returns:
-            Model state dictionary for the voice
-
-        Raises:
-            ValueError: If voice cannot be loaded
-        """
         if not self.is_loaded:
             raise RuntimeError('Model not loaded. Call load_model() first.')
 
-        # Resolve the voice path
         resolved_key = self._resolve_voice_path(voice_id_or_path)
 
-        # Check cache
+        # Cache check with LRU touch.
         if resolved_key in self.voice_cache:
-            logger.debug(f'Using cached voice state for: {resolved_key}')
+            self.voice_cache.move_to_end(resolved_key)
+            logger.debug(f'Using in-memory voice state for: {resolved_key}')
             return self.voice_cache[resolved_key]
 
-        # Load voice
+        # If resolved to a tagged cache, check staleness against raw-audio source.
+        resolved_path = Path(resolved_key) if os.path.isabs(resolved_key) else None
+        regenerate_from_source: Path | None = None
+
+        if resolved_path and resolved_path.suffix == '.safetensors' and self.voices_dir:
+            stem = resolved_path.stem.split('.', 1)[0]  # strip tag if present
+            for ext in AUDIO_EXTENSIONS:
+                source = Path(self.voices_dir) / f'{stem}{ext}'
+                if cache_is_stale(cache_path=resolved_path, source_path=source):
+                    regenerate_from_source = source
+                    break
+
         logger.info(f'Loading voice: {resolved_key}')
         t0 = time.time()
 
         try:
-            state = self.model.get_state_for_audio_prompt(resolved_key)
+            if regenerate_from_source:
+                logger.info(f'Regenerating stale cache from {regenerate_from_source}')
+                state = self.model.get_state_for_audio_prompt(regenerate_from_source, truncate=True)
+                self._save_cloned_state(state, regenerate_from_source)
+            elif resolved_path and resolved_path.suffix.lower() in AUDIO_EXTENSIONS:
+                state = self.model.get_state_for_audio_prompt(resolved_path, truncate=True)
+                self._save_cloned_state(state, resolved_path)
+            else:
+                # Pre-made .safetensors OR built-in OR hf:// — let pocket-tts handle it.
+                state = self.model.get_state_for_audio_prompt(resolved_key)
+
+            # LRU insert.
             self.voice_cache[resolved_key] = state
+            if len(self.voice_cache) > 32:
+                self.voice_cache.popitem(last=False)
+
             load_time = time.time() - t0
             logger.info(f'Voice loaded in {load_time:.2f}s: {resolved_key}')
             return state
@@ -308,43 +353,33 @@ class TTSService:
 
         return False, f'Voice not found: {voice_id_or_path}'
 
-    def generate_audio(self, voice_state: dict, text: str) -> torch.Tensor:
-        """
-        Generate complete audio for given text.
+    def generate_audio(self, voice_state: dict, text: str):
+        """Generate complete audio for given text."""
+        import torch  # noqa: F401 — kept for return-type doc
 
-        Args:
-            voice_state: Model state from get_voice_state()
-            text: Text to synthesize
-
-        Returns:
-            Audio tensor
-        """
+        if self._loading:
+            raise RuntimeError('model reloading')
         if not self.is_loaded:
             raise RuntimeError('Model not loaded')
 
-        t0 = time.time()
-        audio = self.model.generate_audio(voice_state, text)
-        gen_time = time.time() - t0
+        with self._lock:
+            t0 = time.time()
+            audio = self.model.generate_audio(voice_state, text)
+            gen_time = time.time() - t0
 
         logger.info(f'Generated {len(text)} chars in {gen_time:.2f}s')
         return audio
 
-    def generate_audio_stream(self, voice_state: dict, text: str) -> Iterator[torch.Tensor]:
-        """
-        Generate audio in streaming chunks.
-
-        Args:
-            voice_state: Model state from get_voice_state()
-            text: Text to synthesize
-
-        Yields:
-            Audio tensor chunks
-        """
+    def generate_audio_stream(self, voice_state: dict, text: str):
+        """Generate audio in streaming chunks. Holds the lock for the entire stream."""
+        if self._loading:
+            raise RuntimeError('model reloading')
         if not self.is_loaded:
             raise RuntimeError('Model not loaded')
 
         logger.info(f'Starting streaming generation for {len(text)} chars')
-        yield from self.model.generate_audio_stream(voice_state, text)
+        with self._lock:
+            yield from self.model.generate_audio_stream(voice_state, text)
 
     def list_voices(self) -> list[dict]:
         """

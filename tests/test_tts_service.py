@@ -196,3 +196,70 @@ def test_reload_model_restores_previous_on_failure(_ensure, service, mock_tts_mo
     assert service.model is original_model
     assert service._active['value'] == 'english'
     assert service._loading is False
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_generate_audio_raises_when_loading(_ensure, service, mock_tts_model):
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+    service._loading = True
+    with pytest.raises(RuntimeError, match='model reloading'):
+        service.generate_audio(voice_state={}, text='hi')
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_get_voice_state_saves_clone_to_cache(_ensure, tmp_path, monkeypatch, mock_tts_model):
+    voices = tmp_path / 'voices'
+    voices.mkdir()
+    cache = tmp_path / 'voice_cache'
+    (voices / 'emma.wav').write_bytes(b'fake-audio')
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+
+    service = TTSService()
+    service.set_voices_dir(str(voices))
+    mock_tts_model.get_state_for_audio_prompt.return_value = {'fake': 'state'}
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    with patch('app.services.tts.export_model_state') as mock_export:
+        state = service.get_voice_state('emma')
+
+    assert state == {'fake': 'state'}
+    mock_export.assert_called_once()
+    # Called with state and expected cache path
+    args = mock_export.call_args.args
+    assert args[0] == {'fake': 'state'}
+    assert str(args[1]).endswith('emma.english_2026-04.safetensors')
+    assert (cache).is_dir()
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_get_voice_state_regenerates_when_source_newer(_ensure, tmp_path, monkeypatch, mock_tts_model):
+    import os, time
+    voices = tmp_path / 'voices'
+    voices.mkdir()
+    cache = tmp_path / 'voice_cache'
+    cache.mkdir()
+    stale = cache / 'emma.english_2026-04.safetensors'
+    stale.write_bytes(b'old')
+    os.utime(stale, (time.time() - 100, time.time() - 100))
+    (voices / 'emma.wav').write_bytes(b'new-audio')  # mtime = now
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+
+    service = TTSService()
+    service.set_voices_dir(str(voices))
+    mock_tts_model.get_state_for_audio_prompt.return_value = {'fresh': 'state'}
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    with patch('app.services.tts.export_model_state') as mock_export:
+        state = service.get_voice_state('emma')
+
+    assert state == {'fresh': 'state'}
+    # Should have called get_state_for_audio_prompt with the .wav file, not the stale cache
+    call_arg = mock_tts_model.get_state_for_audio_prompt.call_args.args[0]
+    assert str(call_arg).endswith('emma.wav')
+    mock_export.assert_called_once()
