@@ -14,6 +14,7 @@ from flask import (
     stream_with_context,
 )
 
+from app.config import Config
 from app.logging_config import get_logger
 from app.services.audio import (
     convert_audio,
@@ -24,6 +25,7 @@ from app.services.audio import (
 )
 from app.services.preprocess import TextPreprocessor
 from app.services.tts import get_tts_service
+from app.services.versions import get_versions
 
 logger = get_logger('routes')
 
@@ -99,6 +101,31 @@ def list_voices():
             ],
         }
     )
+
+
+@api.route('/v1/model', methods=['GET'])
+def get_model():
+    """Return the active model state, boot snapshot, and supported languages."""
+    tts = get_tts_service()
+
+    active = tts._active or {'source': 'default', 'value': None, 'quantize': False}
+    boot = tts._boot_active or active
+    differs = active != boot
+    model_path_locked = boot.get('source') == 'model_path'
+    versions = get_versions()
+
+    return jsonify({
+        'active': active,
+        'boot': boot,
+        'differs_from_boot': differs,
+        'loading': tts._loading,
+        'loading_target': getattr(tts, '_loading_target', None),
+        'last_error': getattr(tts, '_last_reload_error', None),
+        'model_path_locked': model_path_locked,
+        'available_languages': list(Config.SUPPORTED_LANGUAGES),
+        'server_version': versions['server'],
+        'pocket_tts_version': versions['pocket_tts'],
+    })
 
 
 @api.route('/v1/audio/speech', methods=['POST'])
