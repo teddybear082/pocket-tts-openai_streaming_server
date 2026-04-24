@@ -88,7 +88,9 @@ def convert_audio(
         buffer.seek(0)
         return buffer
     except Exception as e:
-        logger.error(f"Error converting audio to {target_format} (backend format: {actual_format}): {e}")
+        logger.error(
+            f'Error converting audio to {target_format} (backend format: {actual_format}): {e}'
+        )
         raise
 
 
