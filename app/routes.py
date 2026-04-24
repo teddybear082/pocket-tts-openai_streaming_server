@@ -196,6 +196,9 @@ def generate_speech():
 
     tts = get_tts_service()
 
+    if tts._loading:
+        return jsonify({'error': 'Model is reloading; retry shortly.'}), 503
+
     # Validate voice first
     is_valid, msg = tts.validate_voice(voice)
     if not is_valid:
@@ -233,8 +236,29 @@ def generate_speech():
         return _generate_file(tts, voice_state, text, target_format)
 
     except ValueError as e:
+        msg = str(e)
+        # Detect the legacy-unlabeled-safetensors mismatch pattern.
+        resolved = tts._resolve_voice_path(voice) if not tts._loading else ''
+        is_legacy_st = resolved.endswith('.safetensors') and not any(
+            resolved.endswith(f'.{tag}.safetensors')
+            for tag in Config.SUPPORTED_LANGUAGES
+        )
+        mismatch_markers = ('size mismatch', 'Error(s) in loading state_dict', 'shape')
+        if is_legacy_st and any(m in msg for m in mismatch_markers):
+            return jsonify({
+                'error': 'voice_model_mismatch',
+                'message': (
+                    f"Voice '{voice}' appears to have been cloned for a different "
+                    f"model. Upload the original audio (.wav/.mp3/.flac) to "
+                    f"re-clone for the active model, or switch to the model it "
+                    f"was generated for."
+                ),
+                'voice': voice,
+                'active_model': (tts._active or {}).get('value'),
+            }), 400
+
         logger.warning(f'Voice loading failed: {e}')
-        return jsonify({'error': str(e)}), 400
+        return jsonify({'error': msg}), 400
     except Exception as e:
         logger.exception('Generation failed')
         return jsonify({'error': str(e)}), 500

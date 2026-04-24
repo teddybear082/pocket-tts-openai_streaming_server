@@ -100,3 +100,29 @@ def test_post_model_400_on_missing_language(client, mock_tts_service):
 def test_post_model_400_on_empty_body(client, mock_tts_service):
     resp = client.post('/v1/model', json={})
     assert resp.status_code == 400
+
+
+def test_speech_returns_503_when_loading(client, mock_tts_service):
+    mock_tts_service._loading = True
+    resp = client.post('/v1/audio/speech', json={'input': 'hi', 'voice': 'alba'})
+    assert resp.status_code == 503
+    assert 'reloading' in resp.get_json()['error'].lower()
+
+
+def test_speech_voice_model_mismatch_returns_400_with_code(client, mock_tts_service, tmp_path):
+    """When the resolved voice is a legacy unlabeled .safetensors and pocket-tts
+    raises a shape-mismatch during load, the route surfaces a helpful error."""
+    # Simulate: validate_voice succeeds, get_voice_state raises.
+    legacy = tmp_path / 'emma.safetensors'
+    legacy.write_bytes(b'x')
+    mock_tts_service.validate_voice.return_value = (True, 'ok')
+    mock_tts_service._resolve_voice_path.return_value = str(legacy)
+    mock_tts_service.get_voice_state.side_effect = ValueError(
+        "Voice 'emma' could not be loaded: RuntimeError: size mismatch for layer.0.weight"
+    )
+    resp = client.post('/v1/audio/speech', json={'input': 'hi', 'voice': 'emma'})
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body['error'] == 'voice_model_mismatch'
+    assert body['voice'] == 'emma'
+    assert body['active_model'] == 'english'
