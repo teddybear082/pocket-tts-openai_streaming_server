@@ -9,6 +9,7 @@ pocket-tts>=2.0.0
 # Audio processing
 torch>=2.0.0,<=2.8.0
 torchaudio>=2.0.0,<=2.8.0
+torchao==0.13.0
 scipy>=1.10.0
 numpy>=1.24.0
 soundfile>=0.12.0

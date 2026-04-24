@@ -154,7 +154,7 @@ with client.audio.speech.with_streaming_response.create(
 | `model`           | string  | No       | -       | Ignored (for OpenAI compatibility)                 |
 | `input`           | string  | Yes      | -       | Text to synthesize                                 |
 | `voice`           | string  | No       | `alba`  | Voice ID (see `/v1/voices`)                        |
-| `response_format` | string  | No       | `mp3`   | Output format: `mp3`, `wav`, `pcm`, `opus`, `flac` |
+| `response_format` | string  | No       | `mp3`   | Output format: `mp3`, `wav`, `pcm`, `opus`, `aac`, `flac` |
 | `stream`          | boolean | No       | `false` | Enable streaming response                          |
 
 ## Custom Voices

@@ -43,6 +43,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 			if (fmt === 'mp3') {
 				infoLabel.textContent =
 					'Streaming is not available for MP3 (Server limitation). A full file will be generated and played.';
+			} else if (['opus', 'aac', 'flac'].includes(fmt)) {
+				infoLabel.textContent = `Streaming is not available for ${fmt.toUpperCase()}. A full file will be generated and played.`;
 			} else {
 				infoLabel.textContent = 'Streaming is not available for this format.';
 			}

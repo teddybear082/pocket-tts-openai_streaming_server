@@ -63,12 +63,34 @@ def convert_audio(
     if audio_tensor.dim() == 1:
         audio_tensor = audio_tensor.unsqueeze(0)
 
+    # Handle PCM raw bytes (no container)
+    if target_format == 'pcm':
+        try:
+            pcm_bytes = tensor_to_pcm_bytes(audio_tensor)
+            buffer.write(pcm_bytes)
+            buffer.seek(0)
+            return buffer
+        except Exception as e:
+            logger.error(f'Error converting audio to PCM: {e}')
+            raise
+
+    # Map OpenAI format names to torchaudio/backend supported format names
+    # torchaudio uses 'ogg' as the container for 'opus'
+    # 'aac' usually requires 'adts' or 'm4a'
+    actual_format = target_format
+    if actual_format == 'opus':
+        actual_format = 'ogg'
+    elif actual_format == 'aac':
+        actual_format = 'adts'
+
     try:
-        torchaudio.save(buffer, audio_tensor, sample_rate, format=target_format)
+        torchaudio.save(buffer, audio_tensor, sample_rate, format=actual_format)
         buffer.seek(0)
         return buffer
     except Exception as e:
-        logger.error(f'Error converting audio to {target_format}: {e}')
+        logger.error(
+            f'Error converting audio to {target_format} (backend format: {actual_format}): {e}'
+        )
         raise
 
 
