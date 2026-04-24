@@ -263,3 +263,27 @@ def test_get_voice_state_regenerates_when_source_newer(_ensure, tmp_path, monkey
     call_arg = mock_tts_model.get_state_for_audio_prompt.call_args.args[0]
     assert str(call_arg).endswith('emma.wav')
     mock_export.assert_called_once()
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_list_voices_collapses_per_stem(_ensure, tmp_path, monkeypatch, mock_tts_model):
+    voices = tmp_path / 'voices'
+    voices.mkdir()
+    cache = tmp_path / 'voice_cache'
+    cache.mkdir()
+    (voices / 'emma.wav').write_bytes(b'a')
+    (voices / 'emma.safetensors').write_bytes(b'a')
+    (cache / 'emma.english_2026-04.safetensors').write_bytes(b'a')
+    (cache / 'emma.german_24l.safetensors').write_bytes(b'a')
+    (voices / 'morgan.mp3').write_bytes(b'a')
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+
+    service = TTSService()
+    service.set_voices_dir(str(voices))
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    voices_list = service.list_voices()
+    custom_ids = [v['id'] for v in voices_list if v['type'] == 'custom']
+    assert custom_ids == ['emma', 'morgan']

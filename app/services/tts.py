@@ -382,45 +382,25 @@ class TTSService:
             yield from self.model.generate_audio_stream(voice_state, text)
 
     def list_voices(self) -> list[dict]:
-        """
-        List all available voices.
+        """List built-in voices and custom voices (one entry per stem)."""
+        from pathlib import Path
 
-        Returns:
-            List of voice dictionaries with 'id' and 'name' keys
-        """
-        voices = []
+        from app.services.voice_cache import list_voice_stems
 
-        # Built-in voices (sorted alphabetically)
-        builtin_sorted = sorted(Config.BUILTIN_VOICES)
-        for voice in builtin_sorted:
-            voices.append({'id': voice, 'name': voice.capitalize(), 'type': 'builtin'})
+        voices: list[dict] = []
 
-        # Custom voices from directory
-        custom_voices = []
-        if self.voices_dir and os.path.isdir(self.voices_dir):
-            voice_dir = Path(self.voices_dir)
+        # Built-in voices (sorted).
+        for name in sorted(Config.BUILTIN_VOICES):
+            voices.append({'id': name, 'name': name.capitalize(), 'type': 'builtin'})
 
-            # Collect all valid files
-            voice_files = []
-            for ext in Config.VOICE_EXTENSIONS:
-                voice_files.extend(voice_dir.glob(f'*{ext}'))
+        voices_path = Path(self.voices_dir) if self.voices_dir else None
+        stems = list_voice_stems(voices_dir=voices_path, cache_dir=self.cache_dir)
 
-            # Sort alphabetically by filename
-            voice_files.sort(key=lambda f: f.name.lower())
+        for stem in stems:
+            # Format name: "bobby_mcfern" -> "Bobby Mcfern"
+            clean_name = stem.replace('_', ' ').replace('-', ' ').title()
+            voices.append({'id': stem, 'name': clean_name, 'type': 'custom'})
 
-            for voice_file in voice_files:
-                # Format name: "bobby_mcfern" -> "Bobby Mcfern"
-                clean_name = voice_file.stem.replace('_', ' ').replace('-', ' ').title()
-
-                custom_voices.append(
-                    {
-                        'id': voice_file.name,
-                        'name': clean_name,
-                        'type': 'custom',
-                    }
-                )
-
-        voices.extend(custom_voices)
         return voices
 
 
