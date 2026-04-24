@@ -71,6 +71,9 @@ def init_tts_service(
     # Load model
     tts.load_model(model_path=model_path, language=language, quantize=quantize)
 
+    # Pre-create the voice cache directory (or log warning if not writable)
+    tts._ensure_cache_dir()
+
     # Set voices directory
     if voices_dir:
         tts.set_voices_dir(voices_dir)
