@@ -51,6 +51,22 @@ class TTSService:
         self._active: dict | None = None
         self._boot_active: dict | None = None
 
+        from pathlib import Path
+        self.cache_dir: Path | None = Path(Config.VOICE_CACHE_DIR)
+
+    def _ensure_cache_dir(self) -> None:
+        """Create the voice cache directory on first need. Tolerate read-only FS."""
+        if self.cache_dir is None:
+            return
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            logger.warning(
+                f'Voice cache dir {self.cache_dir} is not writable ({e}); '
+                f'cache persistence disabled.'
+            )
+            self.cache_dir = None
+
     @property
     def is_loaded(self) -> bool:
         """Check if the model is loaded."""
@@ -186,53 +202,42 @@ class TTSService:
             raise ValueError(f"Voice '{voice_id_or_path}' could not be loaded: {e}") from e
 
     def _resolve_voice_path(self, voice_id_or_path: str) -> str:
+        """Resolve a voice identifier using per-model cache preference.
+
+        Raises ValueError on unsafe URL schemes (retained from previous behavior).
         """
-        Resolve a voice identifier to its actual path or ID.
+        from pathlib import Path
 
-        Args:
-            voice_id_or_path: Voice identifier
+        from app.services.voice_cache import resolve_voice_path
 
-        Returns:
-            Resolved path or identifier
-
-        Raises:
-            ValueError: If unsafe URL scheme is used
-        """
-        # Block potentially dangerous URL schemes (SSRF protection)
+        # Retain SSRF protection.
         if voice_id_or_path.startswith(('http://', 'https://')):
             raise ValueError(
                 f'URL scheme not allowed for security reasons: {voice_id_or_path[:50]}. '
                 "Use 'hf://' for HuggingFace models or provide a local file path."
             )
 
-        # Allow HuggingFace URLs
         if voice_id_or_path.startswith('hf://'):
             return voice_id_or_path
 
-        # Check if it's a built-in voice
+        # Built-in names pass through untouched (pocket-tts handles resolution).
         if voice_id_or_path.lower() in Config.BUILTIN_VOICES:
             return voice_id_or_path.lower()
 
-        # Check voices directory
-        if self.voices_dir:
-            for ext in Config.VOICE_EXTENSIONS:
-                # Try exact match first
-                possible_path = os.path.join(self.voices_dir, voice_id_or_path)
-                if os.path.exists(possible_path):
-                    return os.path.abspath(possible_path)
-
-                # Try with extension
-                if not voice_id_or_path.endswith(ext):
-                    possible_path = os.path.join(self.voices_dir, voice_id_or_path + ext)
-                    if os.path.exists(possible_path):
-                        return os.path.abspath(possible_path)
-
-        # Check if it's an absolute path that exists
+        # Absolute path hit.
         if os.path.isabs(voice_id_or_path) and os.path.exists(voice_id_or_path):
             return voice_id_or_path
 
-        # Return as-is, let pocket-tts handle it
-        return voice_id_or_path
+        voices_path = Path(self.voices_dir) if self.voices_dir else None
+        active_model = (self._active or {}).get('value') or 'english'
+
+        resolved = resolve_voice_path(
+            voice_id=voice_id_or_path,
+            active_model=active_model,
+            voices_dir=voices_path,
+            cache_dir=self.cache_dir,
+        )
+        return str(resolved) if isinstance(resolved, Path) else resolved
 
     def validate_voice(self, voice_id_or_path: str) -> tuple[bool, str]:
         """

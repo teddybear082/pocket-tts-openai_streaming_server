@@ -77,3 +77,55 @@ def test_load_model_default_has_default_source(_ensure, service, mock_tts_model)
 
     assert service._active['source'] == 'default'
     assert service._active['value'] is None
+
+
+from pathlib import Path
+
+
+def test_service_initializes_cache_dir(tmp_path, monkeypatch):
+    cache = tmp_path / 'voice_cache'
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+    service = TTSService()
+    # Lazy create on first use is fine — just verify the path is stored
+    assert service.cache_dir == cache
+
+
+def test_service_cache_dir_mkdir_on_first_save(tmp_path, monkeypatch):
+    cache = tmp_path / 'voice_cache'  # does not exist yet
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+    service = TTSService()
+    service._ensure_cache_dir()
+    assert cache.is_dir()
+
+
+def test_service_cache_dir_read_only_is_tolerated(tmp_path, monkeypatch, caplog):
+    """If mkdir raises (read-only FS), log and disable caching."""
+    import os
+    ro_parent = tmp_path / 'ro'
+    ro_parent.mkdir()
+    os.chmod(ro_parent, 0o500)  # r-x, not writable
+    cache = ro_parent / 'voice_cache'
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+    service = TTSService()
+    service._ensure_cache_dir()
+    assert service.cache_dir is None
+    os.chmod(ro_parent, 0o700)  # restore for cleanup
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_resolve_voice_path_uses_active_model(_ensure, tmp_path, monkeypatch, mock_tts_model):
+    voices = tmp_path / 'voices'
+    voices.mkdir()
+    cache = tmp_path / 'voice_cache'
+    cache.mkdir()
+    (cache / 'emma.german_24l.safetensors').write_bytes(b'x')
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+
+    service = TTSService()
+    service.set_voices_dir(str(voices))
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='german_24l', quantize=False)
+
+    resolved = service._resolve_voice_path('emma')
+    assert resolved == str(cache / 'emma.german_24l.safetensors')
