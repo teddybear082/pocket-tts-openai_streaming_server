@@ -37,10 +37,19 @@ class TTSService:
     """
 
     def __init__(self):
+        import threading
+        from collections import OrderedDict
+
         self.model = None
-        self.voice_cache: dict = {}
+        self.voice_cache: OrderedDict = OrderedDict()
         self.voices_dir: str | None = None
         self._model_loaded = False
+
+        # Concurrency + reload state
+        self._lock = threading.Lock()
+        self._loading = False  # fast-path flag; read without lock
+        self._active: dict | None = None
+        self._boot_active: dict | None = None
 
     @property
     def is_loaded(self) -> bool:
@@ -66,6 +75,7 @@ class TTSService:
         model_path: str | None = None,
         language: str | None = None,
         quantize: bool = False,
+        _is_boot: bool = True,
     ) -> None:
         """
         Load the TTS model.
@@ -75,17 +85,17 @@ class TTSService:
             language: Optional language identifier (e.g., english, french_24l).
                       Incompatible with model_path.
             quantize: If True, apply dynamic int8 quantization to reduce memory.
+            _is_boot: Internal; True only for the first boot-time load. Controls
+                      whether _boot_active is initialized.
         """
         _ensure_pocket_tts()
 
         logger.info('Loading Pocket TTS model...')
         t0 = time.time()
 
-        # Determine model path
         effective_path = model_path
 
         if not effective_path:
-            # Check for bundled model in frozen executable
             _, bundle_model = Config.get_bundle_paths()
             if bundle_model and os.path.isfile(bundle_model):
                 effective_path = bundle_model
@@ -95,14 +105,21 @@ class TTSService:
             if effective_path:
                 logger.info(f'Loading model from: {effective_path}')
                 self.model = TTSModel.load_model(config=effective_path, quantize=quantize)
+                active = {'source': 'model_path', 'value': effective_path, 'quantize': quantize}
             elif language:
                 logger.info(f'Loading model with language: {language}')
                 self.model = TTSModel.load_model(language=language, quantize=quantize)
+                active = {'source': 'language', 'value': language, 'quantize': quantize}
             else:
                 logger.info('Loading default model from HuggingFace...')
                 self.model = TTSModel.load_model(quantize=quantize)
+                active = {'source': 'default', 'value': None, 'quantize': quantize}
 
             self._model_loaded = True
+            self._active = active
+            if _is_boot:
+                self._boot_active = dict(active)
+
             load_time = time.time() - t0
             logger.info(
                 f'Model loaded in {load_time:.2f}s. '
