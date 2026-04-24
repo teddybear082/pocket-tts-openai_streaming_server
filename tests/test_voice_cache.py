@@ -6,7 +6,9 @@ import pytest
 
 from app.services.voice_cache import (
     active_model_tag,
+    cache_is_stale,
     known_model_tags,
+    list_voice_stems,
     parse_safetensors_name,
     resolve_voice_path,
 )
@@ -114,3 +116,58 @@ def test_resolve_voice_path_voices_dir_tagged_cache(tmp_voices, tmp_cache):
         voices_dir=tmp_voices, cache_dir=tmp_cache,
     )
     assert result == tmp_voices / 'emma.german_24l.safetensors'
+
+
+def test_list_voice_stems_collapses_duplicates(tmp_voices, tmp_cache):
+    (tmp_voices / 'emma.wav').write_bytes(b'a')
+    (tmp_voices / 'emma.safetensors').write_bytes(b'a')
+    (tmp_cache / 'emma.english_2026-04.safetensors').write_bytes(b'a')
+    (tmp_cache / 'emma.german_24l.safetensors').write_bytes(b'a')
+    (tmp_voices / 'morgan.mp3').write_bytes(b'a')
+
+    stems = list_voice_stems(voices_dir=tmp_voices, cache_dir=tmp_cache)
+    assert stems == ['emma', 'morgan']
+
+
+def test_list_voice_stems_empty(tmp_voices, tmp_cache):
+    assert list_voice_stems(voices_dir=tmp_voices, cache_dir=tmp_cache) == []
+
+
+def test_list_voice_stems_ignores_unknown_extensions(tmp_voices, tmp_cache):
+    (tmp_voices / 'notes.txt').write_bytes(b'a')
+    (tmp_voices / 'emma.wav').write_bytes(b'a')
+    stems = list_voice_stems(voices_dir=tmp_voices, cache_dir=tmp_cache)
+    assert stems == ['emma']
+
+
+def test_cache_is_stale_true_when_source_newer(tmp_voices, tmp_cache):
+    import os, time
+    cache = tmp_cache / 'emma.english_2026-04.safetensors'
+    cache.write_bytes(b'old')
+    old_time = time.time() - 100
+    os.utime(cache, (old_time, old_time))
+
+    source = tmp_voices / 'emma.wav'
+    source.write_bytes(b'new')  # mtime = now
+
+    assert cache_is_stale(cache_path=cache, source_path=source) is True
+
+
+def test_cache_is_stale_false_when_cache_newer(tmp_voices, tmp_cache):
+    source = tmp_voices / 'emma.wav'
+    source.write_bytes(b'old')
+    import os, time
+    old_time = time.time() - 100
+    os.utime(source, (old_time, old_time))
+
+    cache = tmp_cache / 'emma.english_2026-04.safetensors'
+    cache.write_bytes(b'new')
+
+    assert cache_is_stale(cache_path=cache, source_path=source) is False
+
+
+def test_cache_is_stale_false_when_source_missing(tmp_voices, tmp_cache):
+    cache = tmp_cache / 'emma.english_2026-04.safetensors'
+    cache.write_bytes(b'cached')
+    source = tmp_voices / 'emma.wav'  # does not exist
+    assert cache_is_stale(cache_path=cache, source_path=source) is False

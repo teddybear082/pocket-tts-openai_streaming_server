@@ -77,3 +77,36 @@ def resolve_voice_path(
             return p
 
     return voice_id
+
+
+AUDIO_EXTENSIONS = ('.wav', '.mp3', '.flac')
+
+
+def list_voice_stems(
+    voices_dir: Path | None,
+    cache_dir: Path | None,
+) -> list[str]:
+    """Return the unique voice stems present across voices_dir and cache_dir."""
+    stems: set[str] = set()
+    tags = known_model_tags()
+
+    for directory in (voices_dir, cache_dir):
+        if not directory or not directory.is_dir():
+            continue
+        for ext in AUDIO_EXTENSIONS:
+            for f in directory.glob(f'*{ext}'):
+                stems.add(f.stem)
+        for f in directory.glob('*.safetensors'):
+            stem, _tag = parse_safetensors_name(f.name, tags)
+            stems.add(stem)
+
+    return sorted(stems)
+
+
+def cache_is_stale(cache_path: Path, source_path: Path) -> bool:
+    """True when `source_path` exists and is newer than `cache_path`."""
+    if not source_path.exists():
+        return False
+    if not cache_path.exists():
+        return False
+    return source_path.stat().st_mtime > cache_path.stat().st_mtime
