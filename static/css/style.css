@@ -622,6 +622,23 @@ audio {
 	transform: translateY(1px);
 }
 
+.version-strip {
+	color: var(--text-secondary);
+	font-size: 0.8em;
+	margin-top: 4px;
+	margin-bottom: 0;
+}
+
+.version-strip a {
+	color: var(--text-secondary);
+	text-decoration: none;
+	border-bottom: 1px dotted currentColor;
+}
+
+.version-strip a:hover {
+	color: var(--text-color);
+}
+
 /* Responsive adjustments */
 @media (max-width: 600px) {
 	.params-table {

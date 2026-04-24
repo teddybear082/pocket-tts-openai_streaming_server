@@ -139,7 +139,6 @@ def test_health_includes_active_model(client, mock_tts_service):
 
 import pytest as _pytest
 
-@_pytest.mark.skip(reason='Template updated in Task 16')
 def test_home_passes_versions_to_template(client, mock_tts_service):
     resp = client.get('/')
     assert resp.status_code == 200
