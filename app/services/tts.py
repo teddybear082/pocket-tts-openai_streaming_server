@@ -257,7 +257,14 @@ class TTSService:
             return self.voice_cache[resolved_key]
 
         # If resolved to a tagged cache, check staleness against raw-audio source.
-        resolved_path = Path(resolved_key) if os.path.isabs(resolved_key) else None
+        # Treat any existing filesystem path as local — relative paths from a
+        # configured `voices_dir` (common in local dev) must still get the
+        # truncate=True clone path and disk caching.
+        resolved_path = (
+            Path(resolved_key)
+            if os.path.isabs(resolved_key) or os.path.exists(resolved_key)
+            else None
+        )
         regenerate_from_source: Path | None = None
 
         if resolved_path and resolved_path.suffix == '.safetensors' and self.voices_dir:
