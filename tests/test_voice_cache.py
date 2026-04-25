@@ -114,6 +114,33 @@ def test_resolve_voice_path_respects_alias(tmp_voices, tmp_cache):
     assert result == tmp_cache / 'emma.english_2026-04.safetensors'
 
 
+def test_resolve_voice_path_finds_alias_tagged_file(tmp_voices, tmp_cache):
+    """Files tagged with the alias itself (e.g. emma.english.safetensors) should
+    resolve when canonical-tagged file is absent — supports caches written by
+    older versions or by external tools using the alias."""
+    (tmp_cache / 'emma.english.safetensors').write_bytes(b'fake-st')
+    result = resolve_voice_path(
+        'emma',
+        active_model='english',
+        voices_dir=tmp_voices,
+        cache_dir=tmp_cache,
+    )
+    assert result == tmp_cache / 'emma.english.safetensors'
+
+
+def test_resolve_voice_path_canonical_preferred_over_alias(tmp_voices, tmp_cache):
+    """When both canonical and alias-tagged files exist, prefer canonical."""
+    (tmp_cache / 'emma.english.safetensors').write_bytes(b'fake-st')
+    (tmp_cache / 'emma.english_2026-04.safetensors').write_bytes(b'fake-st')
+    result = resolve_voice_path(
+        'emma',
+        active_model='english',
+        voices_dir=tmp_voices,
+        cache_dir=tmp_cache,
+    )
+    assert result == tmp_cache / 'emma.english_2026-04.safetensors'
+
+
 def test_resolve_voice_path_voices_dir_tagged_cache(tmp_voices, tmp_cache):
     """A tagged cache dropped directly into voices_dir (e.g. by WingmanAI) is honored."""
     (tmp_voices / 'emma.german_24l.safetensors').write_bytes(b'fake-st')

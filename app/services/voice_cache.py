@@ -47,26 +47,36 @@ def resolve_voice_path(
 ) -> Path | str:
     """Resolve a voice identifier to its on-disk source.
 
-    Preference order:
-      1. cache_dir/<voice_id>.<active_tag>.safetensors
-      2. voices_dir/<voice_id>.<active_tag>.safetensors
-      3. voices_dir/<voice_id>.{wav,mp3,flac}
-      4. voices_dir/<voice_id>.safetensors  (legacy unlabeled)
-      5. The bare voice_id string — pocket-tts will resolve (e.g. built-ins).
-    """
-    tag = active_model_tag(active_model)
-    tagged_filename = f'{voice_id}.{tag}.safetensors'
+    Preference order (within each directory, the canonical-tagged filename
+    is checked first; if `active_model` is an alias, the alias-tagged
+    filename is checked as a fallback so files written under either name
+    resolve correctly):
+      1. cache_dir/<voice_id>.<canonical_tag>.safetensors
+      2. cache_dir/<voice_id>.<active_model>.safetensors  (alias fallback)
+      3. voices_dir/<voice_id>.<canonical_tag>.safetensors
+      4. voices_dir/<voice_id>.<active_model>.safetensors  (alias fallback)
+      5. voices_dir/<voice_id>.{wav,mp3,flac}
+      6. voices_dir/<voice_id>.safetensors  (legacy unlabeled)
+      7. The bare voice_id string — pocket-tts will resolve (e.g. built-ins).
 
-    if cache_dir:
-        p = cache_dir / tagged_filename
-        if p.exists():
-            return p
+    New caches are always written using the canonical tag (see
+    `_save_cloned_state` in tts.py), so the alias-tagged paths exist only
+    for files placed by external tools or by users running an older version.
+    """
+    canonical_tag = active_model_tag(active_model)
+    candidates = [f'{voice_id}.{canonical_tag}.safetensors']
+    if active_model != canonical_tag:
+        candidates.append(f'{voice_id}.{active_model}.safetensors')
+
+    for directory in (cache_dir, voices_dir):
+        if not directory:
+            continue
+        for name in candidates:
+            p = directory / name
+            if p.exists():
+                return p
 
     if voices_dir:
-        p = voices_dir / tagged_filename
-        if p.exists():
-            return p
-
         for ext in ('.wav', '.mp3', '.flac'):
             p = voices_dir / f'{voice_id}{ext}'
             if p.exists():
