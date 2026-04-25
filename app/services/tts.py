@@ -238,6 +238,10 @@ class TTSService:
         When the resolved path is raw audio, encode it against the active model
         and persist the result as <stem>.<active_tag>.safetensors in cache_dir.
         If a tagged cache exists but its source audio is newer, regenerate.
+
+        Pocket-tts v2 `TTSModel` is not thread-safe, so model invocations are
+        serialized under `self._lock` (the same lock that protects generation
+        and reload).
         """
 
         from app.services.voice_cache import (
@@ -245,6 +249,8 @@ class TTSService:
             cache_is_stale,
         )
 
+        if self._loading:
+            raise RuntimeError('model reloading')
         if not self.is_loaded:
             raise RuntimeError('Model not loaded. Call load_model() first.')
 
@@ -279,21 +285,25 @@ class TTSService:
         t0 = time.time()
 
         try:
-            if regenerate_from_source:
-                logger.info(f'Regenerating stale cache from {regenerate_from_source}')
-                state = self.model.get_state_for_audio_prompt(regenerate_from_source, truncate=True)
-                self._save_cloned_state(state, regenerate_from_source)
-            elif resolved_path and resolved_path.suffix.lower() in AUDIO_EXTENSIONS:
-                state = self.model.get_state_for_audio_prompt(resolved_path, truncate=True)
-                self._save_cloned_state(state, resolved_path)
-            else:
-                # Pre-made .safetensors OR built-in OR hf:// — let pocket-tts handle it.
-                state = self.model.get_state_for_audio_prompt(resolved_key)
+            with self._lock:
+                if regenerate_from_source:
+                    logger.info(f'Regenerating stale cache from {regenerate_from_source}')
+                    state = self.model.get_state_for_audio_prompt(
+                        regenerate_from_source, truncate=True
+                    )
+                    self._save_cloned_state(state, regenerate_from_source)
+                elif resolved_path and resolved_path.suffix.lower() in AUDIO_EXTENSIONS:
+                    state = self.model.get_state_for_audio_prompt(resolved_path, truncate=True)
+                    self._save_cloned_state(state, resolved_path)
+                else:
+                    # Pre-made .safetensors OR built-in OR hf:// — let pocket-tts handle it.
+                    state = self.model.get_state_for_audio_prompt(resolved_key)
 
-            # LRU insert.
-            self.voice_cache[resolved_key] = state
-            if len(self.voice_cache) > 32:
-                self.voice_cache.popitem(last=False)
+                # LRU insert (under the lock for consistency with the dict mutation
+                # in `reload_model.voice_cache.clear()`).
+                self.voice_cache[resolved_key] = state
+                if len(self.voice_cache) > 32:
+                    self.voice_cache.popitem(last=False)
 
             load_time = time.time() - t0
             logger.info(f'Voice loaded in {load_time:.2f}s: {resolved_key}')
@@ -330,6 +340,18 @@ class TTSService:
             return voice_id_or_path
 
         voices_path = Path(self.voices_dir) if self.voices_dir else None
+
+        # Backwards-compat: accept full filenames (e.g. `emma.wav`) by checking
+        # for an exact match in cache_dir / voices_dir before falling through
+        # to stem-based resolution. Without this, `voice_id_or_path` containing
+        # an extension would never match anything and pocket-tts would receive
+        # the raw string.
+        for directory in (self.cache_dir, voices_path):
+            if directory:
+                exact = directory / voice_id_or_path
+                if exact.exists():
+                    return str(exact)
+
         active_model = (self._active or {}).get('value') or 'english'
 
         resolved = resolve_voice_path(
