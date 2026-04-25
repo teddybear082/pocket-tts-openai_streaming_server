@@ -35,6 +35,35 @@ class Config:
     MODEL_PATH = os.environ.get('POCKET_TTS_MODEL_PATH', None)
     LANGUAGE = os.environ.get('POCKET_TTS_LANGUAGE', None)
     QUANTIZE = os.environ.get('POCKET_TTS_QUANTIZE', 'false').lower() == 'true'
+
+    # Supported languages (pocket-tts v2.0.0 predefined model YAMLs)
+    SUPPORTED_LANGUAGES = [
+        'english',  # alias for english_2026-04 (default)
+        'english_2026-01',
+        'english_2026-04',
+        'french_24l',  # no bare `french` — upstream raises
+        'german',
+        'german_24l',
+        'italian',
+        'italian_24l',
+        'portuguese',
+        'portuguese_24l',
+        'spanish',
+        'spanish_24l',
+    ]
+
+    # Canonicalize equivalent model IDs so tagged caches dedupe.
+    LEGACY_MODEL_ALIASES = {
+        'english': 'english_2026-04',
+        'english_2026-01': 'english_2026-04',
+    }
+
+    # Writable voice cache dir for tagged .safetensors clones.
+    VOICE_CACHE_DIR = os.environ.get(
+        'POCKET_TTS_VOICE_CACHE_DIR',
+        str(BASE_PATH / 'voice_cache'),
+    )
+
     DEFAULT_VOICE = os.environ.get(
         'POCKET_TTS_DEFAULT_VOICE', 'hf://kyutai/tts-voices/alba-mackenna/casual.wav'
     )

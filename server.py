@@ -126,6 +126,14 @@ def main():
         logger.error('--language and --model-path are mutually exclusive. Use one or the other.')
         sys.exit(1)
 
+    # Validate --language against supported list (prevents cryptic pocket-tts errors).
+    if args.language and args.language not in Config.SUPPORTED_LANGUAGES:
+        logger.error(
+            f"Unknown language '{args.language}'. "
+            f'Supported: {", ".join(Config.SUPPORTED_LANGUAGES)}'
+        )
+        sys.exit(1)
+
     # Initialize TTS service
     try:
         init_tts_service(

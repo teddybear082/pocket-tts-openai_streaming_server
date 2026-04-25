@@ -30,6 +30,7 @@ services:
       - POCKET_TTS_LANGUAGE=${POCKET_TTS_LANGUAGE:-}
       # Enable int8 quantization for lower memory usage and improved speed
       - POCKET_TTS_QUANTIZE=${POCKET_TTS_QUANTIZE:-false}
+      - POCKET_TTS_VOICE_CACHE_DIR=/app/voice_cache
       # Hugging Face token for voice cloning (optional)
       - HF_TOKEN=${HF_TOKEN:-}
 
@@ -40,6 +41,8 @@ services:
       - ./logs:/app/logs
       # Cache HuggingFace models to avoid re-downloading
       - pockettts-cache:/home/pockettts/.cache/huggingface
+      # Writable cache for per-model cloned voice safetensors
+      - pockettts-voice-cache:/app/voice_cache
 
     restart: unless-stopped
 
@@ -67,3 +70,5 @@ services:
 volumes:
   pockettts-cache:
     name: pockettts-huggingface-cache
+  pockettts-voice-cache:
+    name: pockettts-voice-cache

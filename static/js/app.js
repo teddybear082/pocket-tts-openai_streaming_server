@@ -485,3 +485,196 @@ document.addEventListener('DOMContentLoaded', async () => {
 	// Initial load
 	await loadVoices();
 });
+
+// ============================================================
+// Model Settings panel
+// ============================================================
+
+const modelUI = {
+    activeLabel: document.getElementById('active-model-label'),
+    quantizeBadge: document.getElementById('quantize-badge'),
+    sessionBadge: document.getElementById('session-badge'),
+    loadingIndicator: document.getElementById('loading-indicator'),
+    loadingTargetLabel: document.getElementById('loading-target-label'),
+    languageSelect: document.getElementById('language-select'),
+    quantizeToggle: document.getElementById('quantize-toggle'),
+    applyBtn: document.getElementById('apply-model-btn'),
+    nonEnglishWarning: document.getElementById('non-english-warning'),
+    modelPathLockedNotice: document.getElementById('model-path-locked-notice'),
+    sessionOnlyNotice: document.getElementById('session-only-notice'),
+    applyError: document.getElementById('apply-error'),
+    generateBtn: document.getElementById('generate-btn'),
+};
+
+let currentModelState = null;
+let pollTimer = null;
+let pollDeadline = 0;
+
+function populateLanguageOptions(languages) {
+    if (modelUI.languageSelect.options.length > 0) return;  // already populated
+    for (const lang of languages) {
+        const opt = document.createElement('option');
+        opt.value = lang;
+        opt.textContent = lang;
+        modelUI.languageSelect.appendChild(opt);
+    }
+}
+
+function setHidden(el, hidden) {
+    if (hidden) { el.setAttribute('hidden', ''); }
+    else        { el.removeAttribute('hidden'); }
+}
+
+// Backend reports `value: null` when the server was started without a
+// --language flag. Pocket-tts treats that as "english" internally, so we
+// surface the same string in the UI to keep the dropdown, label, and Apply
+// diff comparison consistent.
+function effectiveActiveValue(state) {
+    return state.active.value || 'english';
+}
+
+function updateUIForState(state) {
+    currentModelState = state;
+    populateLanguageOptions(state.available_languages);
+
+    const activeLang = effectiveActiveValue(state);
+
+    // Header labels
+    modelUI.activeLabel.textContent = activeLang;
+    setHidden(modelUI.quantizeBadge, !state.active.quantize);
+    setHidden(modelUI.sessionBadge, !state.differs_from_boot);
+
+    // Loading indicator
+    if (state.loading && state.loading_target) {
+        modelUI.loadingTargetLabel.textContent = `→ ${state.loading_target.value}`;
+        setHidden(modelUI.loadingIndicator, false);
+    } else {
+        setHidden(modelUI.loadingIndicator, true);
+    }
+
+    // Dropdown reflects active (not the pending target).
+    if (modelUI.languageSelect.value !== activeLang) {
+        modelUI.languageSelect.value = activeLang;
+    }
+    modelUI.quantizeToggle.checked = state.active.quantize;
+
+    // Lock state
+    const locked = state.model_path_locked;
+    modelUI.languageSelect.disabled = locked || state.loading;
+    modelUI.quantizeToggle.disabled = locked || state.loading;
+    setHidden(modelUI.modelPathLockedNotice, !locked);
+
+    // Warnings
+    const selectedLang = modelUI.languageSelect.value;
+    const isEnglishVariant = selectedLang && selectedLang.startsWith('english');
+    setHidden(modelUI.nonEnglishWarning, locked || isEnglishVariant);
+
+    // Session-only notice
+    setHidden(modelUI.sessionOnlyNotice, !state.differs_from_boot);
+
+    // Apply button
+    updateApplyButton();
+
+    // Error banner from last failed reload — also clear it once the backend
+    // reports no error (e.g. after a successful subsequent reload).
+    if (state.last_error) {
+        modelUI.applyError.textContent = state.last_error;
+        setHidden(modelUI.applyError, false);
+    } else {
+        modelUI.applyError.textContent = '';
+        setHidden(modelUI.applyError, true);
+    }
+
+    // Generate button disabled during load
+    modelUI.generateBtn.disabled = state.loading;
+    modelUI.generateBtn.title = state.loading ? 'Model is loading…' : '';
+}
+
+function updateApplyButton() {
+    if (!currentModelState) return;
+    const { active, model_path_locked, loading } = currentModelState;
+    const activeLang = effectiveActiveValue(currentModelState);
+    const targetLang = modelUI.languageSelect.value;
+    const targetQuantize = modelUI.quantizeToggle.checked;
+    const differs = targetLang !== activeLang || targetQuantize !== active.quantize;
+    modelUI.applyBtn.disabled = loading || model_path_locked || !differs;
+}
+
+async function fetchModelState() {
+    try {
+        const resp = await fetch('/v1/model');
+        if (!resp.ok) throw new Error(`GET /v1/model → ${resp.status}`);
+        const state = await resp.json();
+        updateUIForState(state);
+
+        if (!state.loading && pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+    } catch (err) {
+        console.warn('Failed to fetch model state:', err);
+    }
+}
+
+function startPolling() {
+    if (pollTimer) return;
+    pollDeadline = Date.now() + 120_000;  // 2 min timeout
+    pollTimer = setInterval(() => {
+        if (Date.now() > pollDeadline) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            modelUI.applyError.textContent =
+                'Model load timed out after 2 minutes. Check server logs.';
+            setHidden(modelUI.applyError, false);
+            return;
+        }
+        fetchModelState();
+    }, 1000);
+}
+
+async function applyModel() {
+    setHidden(modelUI.applyError, true);
+    modelUI.applyBtn.disabled = true;
+
+    try {
+        const resp = await fetch('/v1/model', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                language: modelUI.languageSelect.value,
+                quantize: modelUI.quantizeToggle.checked,
+            }),
+        });
+        if (resp.status === 202) {
+            startPolling();
+            // Immediately refresh to show loading state.
+            fetchModelState();
+        } else {
+            const body = await resp.json();
+            modelUI.applyError.textContent =
+                body.error || `Server returned ${resp.status}`;
+            setHidden(modelUI.applyError, false);
+            // Revert dropdown to the normalized active value so we never
+            // leave the select on an empty string when the backend reports
+            // the default model with value=null.
+            if (currentModelState) {
+                modelUI.languageSelect.value =
+                    effectiveActiveValue(currentModelState);
+            }
+            updateApplyButton();
+        }
+    } catch (err) {
+        modelUI.applyError.textContent = `Apply failed: ${err.message}`;
+        setHidden(modelUI.applyError, false);
+        updateApplyButton();
+    }
+}
+
+modelUI.languageSelect.addEventListener('change', updateApplyButton);
+modelUI.quantizeToggle.addEventListener('change', updateApplyButton);
+modelUI.applyBtn.addEventListener('click', applyModel);
+
+// Kick off on page load.
+fetchModelState().then(() => {
+    if (currentModelState?.loading) startPolling();
+});

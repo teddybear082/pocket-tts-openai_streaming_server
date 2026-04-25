@@ -109,6 +109,21 @@ select {
 		box-shadow 0.2s;
 }
 
+/* Replace native select chevron with a custom one positioned right next to
+   the content area instead of floating at the far edge of the box.
+   `!important` on background-image is needed because #format-select has an
+   inline `background: var(--input-bg)` that would otherwise reset the image. */
+select {
+	appearance: none;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%238b949e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l5 5 5-5'/%3E%3C/svg%3E") !important;
+	background-repeat: no-repeat !important;
+	background-position: right 14px center !important;
+	background-size: 12px 8px !important;
+	padding-right: 36px !important;
+}
+
 input[type='file'] {
 	width: 100%;
 	padding: 0.5rem;
@@ -620,6 +635,171 @@ audio {
 
 .copy-btn:active {
 	transform: translateY(1px);
+}
+
+.version-strip {
+	color: var(--text-secondary);
+	font-size: 0.8em;
+	margin-top: 4px;
+	margin-bottom: 0;
+}
+
+.version-strip a {
+	color: var(--text-secondary);
+	text-decoration: none;
+	border-bottom: 1px dotted currentColor;
+}
+
+.version-strip a:hover {
+	color: var(--text-color);
+}
+
+.model-settings {
+    margin-bottom: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--input-bg);
+}
+
+.model-settings-summary {
+    padding: 10px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    list-style: none;
+}
+
+.model-settings-summary::-webkit-details-marker {
+    display: none;
+}
+
+.disclosure-caret {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    color: var(--text-secondary);
+}
+
+.model-settings[open] .disclosure-caret {
+    transform: rotate(90deg);
+}
+
+.summary-label #active-model-label {
+    font-family: monospace;
+    color: var(--text-color);
+}
+
+.model-badge {
+    font-size: 0.75em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--border-color);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.session-badge {
+    background: #b45309;
+    color: #fff;
+}
+
+.loading-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+}
+
+.spinner-small {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--text-color);
+    border-radius: 50%;
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+}
+
+.model-settings-body {
+    padding: 14px 14px 14px 14px;
+    border-top: 1px solid var(--border-color);
+}
+
+/* HTML [hidden] is otherwise overridden by display: inline-flex etc. */
+.model-settings [hidden] {
+    display: none !important;
+}
+
+.btn-secondary {
+    padding: 8px 18px;
+    margin-top: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-color);
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        opacity 0.15s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--input-bg);
+    border-color: var(--accent-color);
+}
+
+.btn-secondary:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.btn-secondary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.inline-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.info-banner {
+    padding: 10px 12px;
+    border-radius: 4px;
+    margin-top: 14px;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.info-banner code {
+    font-family: monospace;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 4px;
+    border-radius: 2px;
+}
+
+.info-banner.info {
+    background: rgba(59,130,246,0.08);
+    border-left: 3px solid #3b82f6;
+    color: var(--text-color);
+}
+
+.info-banner.warning {
+    background: rgba(234,179,8,0.08);
+    border-left: 3px solid #eab308;
+    color: var(--text-color);
+}
+
+.info-banner.error {
+    background: rgba(239,68,68,0.08);
+    border-left: 3px solid #ef4444;
+    color: var(--text-color);
 }
 
 /* Responsive adjustments */

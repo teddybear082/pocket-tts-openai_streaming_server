@@ -29,9 +29,70 @@
 				/>
 				<h1>Pocket TTS</h1>
 				<p class="subtitle">Real-time local speech synthesis & voice cloning</p>
+				<p
+					class="version-strip"
+					data-server-version="{{ versions.server }}"
+					data-pocket-tts-version="{{ versions.pocket_tts }}"
+				>
+					Server v{{ versions.server }}
+					· pocket-tts v{{ versions.pocket_tts }}
+					· <a
+						href="https://github.com/teddybear082/pocket-tts-openai_streaming_server"
+						target="_blank"
+						rel="noopener"
+					>GitHub ↗</a>
+				</p>
 			</header>
 
 			<div class="content">
+				<details class="model-settings" id="model-settings">
+				    <summary class="model-settings-summary">
+				        <span class="disclosure-caret" aria-hidden="true">▸</span>
+				        <span class="summary-label">
+				            Model: <span id="active-model-label">loading…</span>
+				        </span>
+				        <span class="model-badge" id="quantize-badge" hidden>int8</span>
+				        <span class="model-badge session-badge" id="session-badge" hidden>session override</span>
+				        <span class="loading-indicator" id="loading-indicator" hidden>
+				            <span class="spinner-small"></span>
+				            <span id="loading-target-label"></span>
+				        </span>
+				    </summary>
+				    <div class="model-settings-body">
+				        <div class="control-group">
+				            <label for="language-select">Language</label>
+				            <select id="language-select">
+				                <!-- Populated by JS from /v1/model -->
+				            </select>
+				        </div>
+				        <div class="control-group">
+				            <label class="inline-label">
+				                <input type="checkbox" id="quantize-toggle" />
+				                Int8 quantization (lower memory, ~30% faster on CPU)
+				            </label>
+				        </div>
+				        <div id="non-english-warning" class="info-banner warning" hidden>
+				            Built-in voices are English only. For best results in other languages,
+				            upload a reference audio sample that matches the target language.
+				            Cloned voices are cached per-model, so switching back to a previously-used
+				            model is instant.
+				        </div>
+				        <div id="model-path-locked-notice" class="info-banner info" hidden>
+				            Server started with a custom model path. Restart without
+				            <code>--model-path</code> to enable language switching.
+				        </div>
+				        <button type="button" id="apply-model-btn" class="btn-secondary" disabled>
+				            Apply
+				        </button>
+				        <div id="session-only-notice" class="info-banner info" hidden>
+				            ⓘ Session-only change. On server restart, the model will revert to the
+				            startup configuration (<code>POCKET_TTS_LANGUAGE</code> env var or
+				            <code>--language</code> CLI flag).
+				        </div>
+				        <div id="apply-error" class="info-banner error" hidden></div>
+				    </div>
+				</details>
+
 				<div class="control-group">
 					<label for="text-input">Text Prompt</label>
 					<textarea
