@@ -45,9 +45,14 @@ class TTSService:
         self.voices_dir: str | None = None
         self._model_loaded = False
 
-        # Concurrency + reload state
+        # Concurrency + reload state.
+        # _lock is held for the duration of model operations (load, generate);
+        # _state_lock is held only briefly to mutate the loading flag and
+        # related state, so concurrent reload claims are atomic without
+        # waiting for in-flight generation to finish.
         self._lock = threading.Lock()
-        self._loading = False  # fast-path flag; read without lock
+        self._state_lock = threading.Lock()
+        self._loading = False  # fast-path flag; read without lock, written under _state_lock
         self._active: dict | None = None
         self._boot_active: dict | None = None
         self._loading_target: dict | None = None
@@ -165,56 +170,94 @@ class TTSService:
             logger.error(f'Failed to load model: {e}')
             raise
 
-    def reload_model(self, language: str, quantize: bool) -> None:
-        """Reload the model with a new language / quantize setting.
-
-        Blocks until any in-flight generation finishes. Serialized via the
-        single TTSService lock (pocket-tts v2 TTSModel is not thread-safe).
-        """
+    def _validate_reload(self, language: str) -> None:
+        """Pre-flight checks shared by sync and async reload paths."""
         if self._boot_active and self._boot_active['source'] == 'model_path':
             raise RuntimeError(
                 'Cannot switch language: server was started with a custom model_path.'
             )
-
         if language not in Config.SUPPORTED_LANGUAGES:
             raise ValueError(f'Unsupported language: {language!r}')
 
-        if self._loading:
-            raise RuntimeError('already loading')
+    def _claim_loading(self, language: str, quantize: bool) -> bool:
+        """Atomically check-and-set the loading flag.
 
-        self._loading = True
-        try:
-            with self._lock:
-                previous_model = self.model
-                previous_active = self._active
-                try:
-                    self.load_model(language=language, quantize=quantize, _is_boot=False)
-                    self.voice_cache.clear()
-                except Exception:
-                    # Restore previous state on failure so the server remains usable.
-                    self.model = previous_model
-                    self._active = previous_active
-                    raise
-        finally:
+        Returns True if this caller owns the reload slot, False if another
+        reload is already in progress. Held briefly under _state_lock so
+        concurrent claims race-free without waiting on the long-held _lock.
+        """
+        with self._state_lock:
+            if self._loading:
+                return False
+            self._loading = True
+            self._loading_target = {'value': language, 'quantize': quantize}
+            self._last_reload_error = None
+        return True
+
+    def _release_loading(self) -> None:
+        with self._state_lock:
             self._loading = False
+            self._loading_target = None
 
-    def reload_model_async(self, language: str, quantize: bool) -> None:
-        """Kick off `reload_model` on a daemon thread. Fire-and-forget."""
+    def _do_reload(self, language: str, quantize: bool) -> None:
+        """Perform the actual model swap. Caller must already hold the loading
+        slot via `_claim_loading`. Restores the previous model on failure."""
+        with self._lock:
+            previous_model = self.model
+            previous_active = self._active
+            try:
+                self.load_model(language=language, quantize=quantize, _is_boot=False)
+                self.voice_cache.clear()
+            except Exception:
+                # Restore previous state on failure so the server remains usable.
+                self.model = previous_model
+                self._active = previous_active
+                raise
+
+    def reload_model(self, language: str, quantize: bool) -> None:
+        """Reload the model synchronously.
+
+        Validates, atomically claims the reload slot, then performs the swap
+        while holding the model lock. Pocket-tts v2 `TTSModel` is not
+        thread-safe so generation is serialized via the same lock.
+
+        Raises:
+            ValueError: unknown language.
+            RuntimeError: model_path locked, already loading, or load failure.
+        """
+        self._validate_reload(language)
+        if not self._claim_loading(language, quantize):
+            raise RuntimeError('already loading')
+        try:
+            self._do_reload(language, quantize)
+        finally:
+            self._release_loading()
+
+    def reload_model_async(self, language: str, quantize: bool) -> bool:
+        """Atomically claim the reload slot and start a worker thread.
+
+        Returns True if the claim succeeded (worker started), False if a
+        reload was already in progress. Validation errors are still raised
+        synchronously so the caller can surface them as 400/403.
+        """
         import threading
 
-        self._loading_target = {'value': language, 'quantize': quantize}
-        self._last_reload_error = None
+        self._validate_reload(language)
+        if not self._claim_loading(language, quantize):
+            return False
 
         def _worker():
             try:
-                self.reload_model(language=language, quantize=quantize)
+                self._do_reload(language, quantize)
             except Exception as e:
-                self._last_reload_error = f'{type(e).__name__}: {e}'
+                with self._state_lock:
+                    self._last_reload_error = f'{type(e).__name__}: {e}'
                 logger.error(f'Reload failed: {self._last_reload_error}')
             finally:
-                self._loading_target = None
+                self._release_loading()
 
         threading.Thread(target=_worker, daemon=True, name='tts-reload').start()
+        return True
 
     def set_voices_dir(self, voices_dir: str | None) -> None:
         """
@@ -247,6 +290,8 @@ class TTSService:
         from app.services.voice_cache import (
             AUDIO_EXTENSIONS,
             cache_is_stale,
+            known_model_tags,
+            parse_safetensors_name,
         )
 
         if self._loading:
@@ -256,11 +301,15 @@ class TTSService:
 
         resolved_key = self._resolve_voice_path(voice_id_or_path)
 
-        # Cache check with LRU touch.
+        # Cache hit fast path. The dict can be cleared concurrently by
+        # `reload_model`, so guard against a KeyError between `in` and access.
         if resolved_key in self.voice_cache:
-            self.voice_cache.move_to_end(resolved_key)
-            logger.debug(f'Using in-memory voice state for: {resolved_key}')
-            return self.voice_cache[resolved_key]
+            try:
+                self.voice_cache.move_to_end(resolved_key)
+                logger.debug(f'Using in-memory voice state for: {resolved_key}')
+                return self.voice_cache[resolved_key]
+            except KeyError:
+                pass  # raced with cache clear; fall through and re-encode
 
         # If resolved to a tagged cache, check staleness against raw-audio source.
         # Treat any existing filesystem path as local — relative paths from a
@@ -274,7 +323,10 @@ class TTSService:
         regenerate_from_source: Path | None = None
 
         if resolved_path and resolved_path.suffix == '.safetensors' and self.voices_dir:
-            stem = resolved_path.stem.split('.', 1)[0]  # strip tag if present
+            # Use the same parser the cache module uses so stems containing
+            # dots (e.g. "John.Doe.english_2026-04.safetensors" → "John.Doe")
+            # are extracted correctly.
+            stem, _tag = parse_safetensors_name(resolved_path.name, known_model_tags())
             for ext in AUDIO_EXTENSIONS:
                 source = Path(self.voices_dir) / f'{stem}{ext}'
                 if cache_is_stale(cache_path=resolved_path, source_path=source):

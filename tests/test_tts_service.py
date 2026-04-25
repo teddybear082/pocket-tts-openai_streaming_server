@@ -205,6 +205,32 @@ def test_reload_model_rejects_if_already_loading(_ensure, service, mock_tts_mode
 
 
 @patch('app.services.tts._ensure_pocket_tts')
+def test_reload_model_async_returns_false_when_already_loading(_ensure, service, mock_tts_model):
+    """Async API uses an atomic check-and-set so concurrent callers can't both
+    win the claim. The loser gets False instead of an exception so the route
+    can map it directly to 409."""
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    service._loading = True
+    started = service.reload_model_async(language='german_24l', quantize=False)
+    assert started is False
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_reload_model_async_validation_still_raises(_ensure, service, mock_tts_model):
+    """Validation errors are still raised synchronously so the route can
+    return 400/403 instead of 409 — only the in-progress check is silent."""
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    with pytest.raises(ValueError, match='klingon'):
+        service.reload_model_async(language='klingon', quantize=False)
+
+
+@patch('app.services.tts._ensure_pocket_tts')
 def test_reload_model_restores_previous_on_failure(_ensure, service, mock_tts_model):
     with patch('app.services.tts.TTSModel') as MockModel:
         MockModel.load_model.return_value = mock_tts_model
@@ -289,6 +315,40 @@ def test_get_voice_state_regenerates_when_source_newer(
     call_arg = mock_tts_model.get_state_for_audio_prompt.call_args.args[0]
     assert str(call_arg).endswith('emma.wav')
     mock_export.assert_called_once()
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_get_voice_state_stem_with_dot_regenerates_correctly(
+    _ensure, tmp_path, monkeypatch, mock_tts_model
+):
+    """A voice stem containing dots (e.g. 'John.Doe') must be parsed via the
+    known_model_tags helper so the staleness check finds the right source
+    file. Naive split('.', 1)[0] would yield 'John' and miss 'John.Doe.wav'."""
+    import os
+    import time
+
+    voices = tmp_path / 'voices'
+    voices.mkdir()
+    cache = tmp_path / 'voice_cache'
+    cache.mkdir()
+    stale = cache / 'John.Doe.english_2026-04.safetensors'
+    stale.write_bytes(b'old')
+    os.utime(stale, (time.time() - 100, time.time() - 100))
+    (voices / 'John.Doe.wav').write_bytes(b'new-audio')
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+
+    service = TTSService()
+    service.set_voices_dir(str(voices))
+    mock_tts_model.get_state_for_audio_prompt.return_value = {'fresh': 'state'}
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    with patch('app.services.tts.export_model_state'):
+        service.get_voice_state('John.Doe')
+
+    call_arg = mock_tts_model.get_state_for_audio_prompt.call_args.args[0]
+    assert str(call_arg).endswith('John.Doe.wav')
 
 
 @patch('app.services.tts._ensure_pocket_tts')
