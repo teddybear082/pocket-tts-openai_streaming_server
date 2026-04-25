@@ -654,9 +654,12 @@ async function applyModel() {
             modelUI.applyError.textContent =
                 body.error || `Server returned ${resp.status}`;
             setHidden(modelUI.applyError, false);
-            // Revert dropdown to active.
-            if (currentModelState?.active?.value) {
-                modelUI.languageSelect.value = currentModelState.active.value;
+            // Revert dropdown to the normalized active value so we never
+            // leave the select on an empty string when the backend reports
+            // the default model with value=null.
+            if (currentModelState) {
+                modelUI.languageSelect.value =
+                    effectiveActiveValue(currentModelState);
             }
             updateApplyButton();
         }
