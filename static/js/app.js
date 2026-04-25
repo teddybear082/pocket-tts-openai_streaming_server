@@ -525,12 +525,22 @@ function setHidden(el, hidden) {
     else        { el.removeAttribute('hidden'); }
 }
 
+// Backend reports `value: null` when the server was started without a
+// --language flag. Pocket-tts treats that as "english" internally, so we
+// surface the same string in the UI to keep the dropdown, label, and Apply
+// diff comparison consistent.
+function effectiveActiveValue(state) {
+    return state.active.value || 'english';
+}
+
 function updateUIForState(state) {
     currentModelState = state;
     populateLanguageOptions(state.available_languages);
 
+    const activeLang = effectiveActiveValue(state);
+
     // Header labels
-    modelUI.activeLabel.textContent = state.active.value || 'default';
+    modelUI.activeLabel.textContent = activeLang;
     setHidden(modelUI.quantizeBadge, !state.active.quantize);
     setHidden(modelUI.sessionBadge, !state.differs_from_boot);
 
@@ -543,8 +553,8 @@ function updateUIForState(state) {
     }
 
     // Dropdown reflects active (not the pending target).
-    if (state.active.value && modelUI.languageSelect.value !== state.active.value) {
-        modelUI.languageSelect.value = state.active.value;
+    if (modelUI.languageSelect.value !== activeLang) {
+        modelUI.languageSelect.value = activeLang;
     }
     modelUI.quantizeToggle.checked = state.active.quantize;
 
@@ -565,10 +575,14 @@ function updateUIForState(state) {
     // Apply button
     updateApplyButton();
 
-    // Error banner from last failed reload
+    // Error banner from last failed reload — also clear it once the backend
+    // reports no error (e.g. after a successful subsequent reload).
     if (state.last_error) {
         modelUI.applyError.textContent = state.last_error;
         setHidden(modelUI.applyError, false);
+    } else {
+        modelUI.applyError.textContent = '';
+        setHidden(modelUI.applyError, true);
     }
 
     // Generate button disabled during load
@@ -579,9 +593,10 @@ function updateUIForState(state) {
 function updateApplyButton() {
     if (!currentModelState) return;
     const { active, model_path_locked, loading } = currentModelState;
+    const activeLang = effectiveActiveValue(currentModelState);
     const targetLang = modelUI.languageSelect.value;
     const targetQuantize = modelUI.quantizeToggle.checked;
-    const differs = targetLang !== active.value || targetQuantize !== active.quantize;
+    const differs = targetLang !== activeLang || targetQuantize !== active.quantize;
     modelUI.applyBtn.disabled = loading || model_path_locked || !differs;
 }
 
