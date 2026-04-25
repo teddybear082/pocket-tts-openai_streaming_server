@@ -187,3 +187,6 @@ cython_debug/
 .DS_Store
 
 voice_cache/
+
+# Internal design specs and implementation plans (kept locally, not in git)
+docs/superpowers/
