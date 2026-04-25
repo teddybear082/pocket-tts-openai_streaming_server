@@ -105,6 +105,22 @@ def test_post_model_400_on_empty_body(client, mock_tts_service):
     assert resp.status_code == 400
 
 
+def test_post_model_400_on_non_bool_quantize(client, mock_tts_service):
+    """JSON booleans only — string 'false' would be truthy under bool() coercion."""
+    resp = client.post('/v1/model', json={'language': 'german_24l', 'quantize': 'false'})
+    assert resp.status_code == 400
+    assert 'boolean' in resp.get_json()['error'].lower()
+
+
+def test_post_model_accepts_omitted_quantize(client, mock_tts_service):
+    """Omitted quantize defaults to False without triggering the type check."""
+    resp = client.post('/v1/model', json={'language': 'german_24l'})
+    assert resp.status_code == 202
+    mock_tts_service.reload_model_async.assert_called_once_with(
+        language='german_24l', quantize=False
+    )
+
+
 def test_speech_returns_503_when_loading(client, mock_tts_service):
     mock_tts_service._loading = True
     resp = client.post('/v1/audio/speech', json={'input': 'hi', 'voice': 'alba'})

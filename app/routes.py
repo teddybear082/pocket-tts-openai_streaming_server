@@ -140,7 +140,14 @@ def post_model():
     """Request a runtime model switch. Returns 202; UI polls GET for completion."""
     data = request.json or {}
     language = data.get('language')
-    quantize = bool(data.get('quantize', False))
+
+    # Reject non-bool `quantize` rather than coercing — `bool('false')` is True,
+    # which would silently enable quantization for any client sending a string.
+    quantize = False
+    if 'quantize' in data:
+        if not isinstance(data['quantize'], bool):
+            return jsonify({'error': "Field 'quantize' must be a boolean"}), 400
+        quantize = data['quantize']
 
     if not language:
         return jsonify({'error': "Missing required field 'language'"}), 400
