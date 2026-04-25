@@ -110,15 +110,17 @@ select {
 }
 
 /* Replace native select chevron with a custom one positioned right next to
-   the content area instead of floating at the far edge of the box. */
+   the content area instead of floating at the far edge of the box.
+   `!important` on background-image is needed because #format-select has an
+   inline `background: var(--input-bg)` that would otherwise reset the image. */
 select {
 	appearance: none;
 	-webkit-appearance: none;
 	-moz-appearance: none;
-	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%238b949e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
-	background-repeat: no-repeat;
-	background-position: right 14px center;
-	background-size: 12px 8px;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%238b949e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M1 1l5 5 5-5'/%3E%3C/svg%3E") !important;
+	background-repeat: no-repeat !important;
+	background-position: right 14px center !important;
+	background-size: 12px 8px !important;
 	padding-right: 36px !important;
 }
 
