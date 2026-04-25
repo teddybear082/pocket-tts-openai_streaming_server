@@ -735,6 +735,7 @@ audio {
 
 .btn-secondary {
     padding: 8px 18px;
+    margin-top: 14px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     background: transparent;
@@ -771,7 +772,7 @@ audio {
 .info-banner {
     padding: 10px 12px;
     border-radius: 4px;
-    margin-top: 10px;
+    margin-top: 14px;
     font-size: 0.9em;
     line-height: 1.4;
 }
