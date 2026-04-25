@@ -138,7 +138,10 @@ def get_model():
 @api.route('/v1/model', methods=['POST'])
 def post_model():
     """Request a runtime model switch. Returns 202; UI polls GET for completion."""
-    data = request.json or {}
+    data = request.json
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Request body must be a JSON object'}), 400
+
     language = data.get('language')
 
     # Reject non-bool `quantize` rather than coercing — `bool('false')` is True,
@@ -169,10 +172,11 @@ def post_model():
             }
         ), 403
 
-    if tts._loading:
+    # `reload_model_async` does the atomic check-and-claim, so the 409 race
+    # window between `if tts._loading` and `start()` is gone.
+    started = tts.reload_model_async(language=language, quantize=quantize)
+    if not started:
         return jsonify({'error': 'A model reload is already in progress.'}), 409
-
-    tts.reload_model_async(language=language, quantize=quantize)
 
     return jsonify(
         {
@@ -201,8 +205,8 @@ def generate_speech():
 
     data = request.json
 
-    if not data:
-        return jsonify({'error': 'Missing JSON body'}), 400
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Request body must be a JSON object'}), 400
 
     text = data.get('input')
     if not text:
@@ -257,8 +261,13 @@ def generate_speech():
 
     except ValueError as e:
         msg = str(e)
-        # Detect the legacy-unlabeled-safetensors mismatch pattern.
-        resolved = tts._resolve_voice_path(voice) if not tts._loading else ''
+        # Detect the legacy-unlabeled-safetensors mismatch pattern. Re-resolving
+        # can itself raise (e.g. SSRF protection on http:// URLs); treat any
+        # failure here as "not a mismatch" and fall through to the generic 400.
+        try:
+            resolved = tts._resolve_voice_path(voice) if not tts._loading else ''
+        except Exception:
+            resolved = ''
         is_legacy_st = resolved.endswith('.safetensors') and not any(
             resolved.endswith(f'.{tag}.safetensors') for tag in Config.SUPPORTED_LANGUAGES
         )

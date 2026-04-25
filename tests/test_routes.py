@@ -84,7 +84,9 @@ def test_post_model_rejects_unknown_language(client, mock_tts_service):
 
 
 def test_post_model_409_when_already_loading(client, mock_tts_service):
-    mock_tts_service._loading = True
+    """Route relies on reload_model_async's atomic claim returning False
+    when a reload is already in progress, not on its own pre-check."""
+    mock_tts_service.reload_model_async.return_value = False
     resp = client.post('/v1/model', json={'language': 'german_24l', 'quantize': False})
     assert resp.status_code == 409
 
@@ -103,6 +105,20 @@ def test_post_model_400_on_missing_language(client, mock_tts_service):
 def test_post_model_400_on_empty_body(client, mock_tts_service):
     resp = client.post('/v1/model', json={})
     assert resp.status_code == 400
+
+
+def test_post_model_400_on_non_dict_body(client, mock_tts_service):
+    """A JSON value that isn't an object (e.g. a number, string, list) must be
+    rejected without raising AttributeError on .get()."""
+    resp = client.post('/v1/model', data='42', content_type='application/json')
+    assert resp.status_code == 400
+    assert 'object' in resp.get_json()['error'].lower()
+
+
+def test_speech_400_on_non_dict_body(client, mock_tts_service):
+    resp = client.post('/v1/audio/speech', data='"hello"', content_type='application/json')
+    assert resp.status_code == 400
+    assert 'object' in resp.get_json()['error'].lower()
 
 
 def test_post_model_400_on_non_bool_quantize(client, mock_tts_service):
@@ -126,6 +142,22 @@ def test_speech_returns_503_when_loading(client, mock_tts_service):
     resp = client.post('/v1/audio/speech', json={'input': 'hi', 'voice': 'alba'})
     assert resp.status_code == 503
     assert 'reloading' in resp.get_json()['error'].lower()
+
+
+def test_speech_does_not_500_when_resolve_raises_in_mismatch_path(client, mock_tts_service):
+    """If get_voice_state raises ValueError AND _resolve_voice_path itself
+    raises (e.g. SSRF protection on http://), the mismatch detection must
+    not propagate the second exception — it should fall through to a clean
+    400 with the original error message."""
+    mock_tts_service.validate_voice.return_value = (True, 'ok')
+    mock_tts_service.get_voice_state.side_effect = ValueError('Voice could not be loaded: nope')
+    mock_tts_service._resolve_voice_path.side_effect = ValueError('URL scheme not allowed')
+
+    resp = client.post(
+        '/v1/audio/speech', json={'input': 'hi', 'voice': 'http://evil.example/voice.wav'}
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()['error'].startswith('Voice could not be loaded')
 
 
 def test_speech_voice_model_mismatch_returns_400_with_code(client, mock_tts_service, tmp_path):
