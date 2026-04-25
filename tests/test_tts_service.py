@@ -131,6 +131,29 @@ def test_resolve_voice_path_uses_active_model(_ensure, tmp_path, monkeypatch, mo
 
 
 @patch('app.services.tts._ensure_pocket_tts')
+def test_resolve_voice_path_accepts_filename_with_extension(
+    _ensure, tmp_path, monkeypatch, mock_tts_model
+):
+    """Backwards-compat: passing 'emma.wav' (with extension) should resolve to
+    the existing file, not get joined with another extension."""
+    voices = tmp_path / 'voices'
+    voices.mkdir()
+    cache = tmp_path / 'voice_cache'
+    cache.mkdir()
+    (voices / 'emma.wav').write_bytes(b'fake-audio')
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+
+    service = TTSService()
+    service.set_voices_dir(str(voices))
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    resolved = service._resolve_voice_path('emma.wav')
+    assert resolved == str(voices / 'emma.wav')
+
+
+@patch('app.services.tts._ensure_pocket_tts')
 def test_reload_model_swaps_and_clears_voice_cache(_ensure, service, mock_tts_model):
     with patch('app.services.tts.TTSModel') as MockModel:
         MockModel.load_model.return_value = mock_tts_model
