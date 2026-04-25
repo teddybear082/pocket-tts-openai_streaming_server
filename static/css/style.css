@@ -709,8 +709,41 @@ audio {
 }
 
 .model-settings-body {
-    padding: 0 14px 14px 14px;
+    padding: 14px 14px 14px 14px;
     border-top: 1px solid var(--border-color);
+}
+
+/* HTML [hidden] is otherwise overridden by display: inline-flex etc. */
+.model-settings [hidden] {
+    display: none !important;
+}
+
+.btn-secondary {
+    padding: 8px 18px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-color);
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+        background 0.15s,
+        border-color 0.15s,
+        opacity 0.15s;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: var(--input-bg);
+    border-color: var(--accent-color);
+}
+
+.btn-secondary:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.btn-secondary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 .inline-label {
