@@ -27,11 +27,7 @@ def active_model_tag(raw_model: str) -> str:
 
     # If the value looks like a file path (separators present, or it ends in
     # a known config extension), reduce it to a filesystem-safe stem.
-    if (
-        '/' in canonical
-        or '\\' in canonical
-        or canonical.lower().endswith(_CONFIG_EXTENSIONS)
-    ):
+    if '/' in canonical or '\\' in canonical or canonical.lower().endswith(_CONFIG_EXTENSIONS):
         last = canonical.replace('\\', '/').rsplit('/', 1)[-1]
         for ext in _CONFIG_EXTENSIONS:
             if last.lower().endswith(ext):
