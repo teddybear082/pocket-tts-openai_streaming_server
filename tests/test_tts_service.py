@@ -284,6 +284,77 @@ def test_get_voice_state_saves_clone_to_cache(_ensure, tmp_path, monkeypatch, mo
 
 
 @patch('app.services.tts._ensure_pocket_tts')
+def test_get_voice_state_saves_clone_under_custom_model_path(
+    _ensure, tmp_path, monkeypatch, mock_tts_model
+):
+    """Issue #13: when started with --model-path "<full file path>", the cache
+    filename must not include the raw path. Otherwise safetensors raises a
+    serialization I/O error on Windows because `:` and `\\` are illegal in
+    filenames. The cache filename must be safe and the call must succeed."""
+    voices = tmp_path / 'voices'
+    voices.mkdir()
+    cache = tmp_path / 'voice_cache'
+    (voices / 'Aadi.wav').write_bytes(b'fake-audio')
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+
+    service = TTSService()
+    service.set_voices_dir(str(voices))
+    mock_tts_model.get_state_for_audio_prompt.return_value = {'fake': 'state'}
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        # Simulate the user starting the server with --model-path on Windows.
+        service.load_model(
+            model_path=r'C:\PocketTTS-Server\model\languages\english\english.yaml',
+            quantize=False,
+        )
+
+    with patch('app.services.tts.export_model_state') as mock_export:
+        state = service.get_voice_state('Aadi')
+
+    assert state == {'fake': 'state'}
+    mock_export.assert_called_once()
+    target_path = mock_export.call_args.args[1]
+    name = target_path.name if hasattr(target_path, 'name') else str(target_path).rsplit('/', 1)[-1]
+    # The filename must contain no characters disallowed in Windows filenames.
+    assert not any(c in name for c in r'\/:*?"<>|'), (
+        f'cache filename {name!r} contains path-illegal chars'
+    )
+    # Stem prefix preserved; suffix is .safetensors.
+    assert name.startswith('Aadi.')
+    assert name.endswith('.safetensors')
+
+
+@patch('app.services.tts._ensure_pocket_tts')
+def test_get_voice_state_tolerates_safetensor_serialize_error(
+    _ensure, tmp_path, monkeypatch, mock_tts_model
+):
+    """Issue #13: SafetensorError does not inherit from OSError, so a serialize
+    failure used to bubble up and break voice loading entirely. Cache writes
+    are best-effort: any failure must be logged and the voice must still load."""
+    from safetensors import SafetensorError
+
+    voices = tmp_path / 'voices'
+    voices.mkdir()
+    cache = tmp_path / 'voice_cache'
+    (voices / 'emma.wav').write_bytes(b'fake-audio')
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+
+    service = TTSService()
+    service.set_voices_dir(str(voices))
+    mock_tts_model.get_state_for_audio_prompt.return_value = {'fake': 'state'}
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    with patch('app.services.tts.export_model_state') as mock_export:
+        mock_export.side_effect = SafetensorError('I/O error: simulated failure')
+        # Must NOT raise — caching is best-effort.
+        state = service.get_voice_state('emma')
+
+    assert state == {'fake': 'state'}
+
+
+@patch('app.services.tts._ensure_pocket_tts')
 def test_get_voice_state_regenerates_when_source_newer(
     _ensure, tmp_path, monkeypatch, mock_tts_model
 ):
