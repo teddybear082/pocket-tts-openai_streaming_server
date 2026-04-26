@@ -22,6 +22,47 @@ def test_active_model_tag_canonicalizes_english_2026_01():
     assert active_model_tag('english_2026-01') == 'english_2026-04'
 
 
+def test_active_model_tag_handles_windows_path():
+    """A custom --model-path value (full Windows file path) must produce a
+    filename-safe tag — not a literal path with `:` and `\\` that breaks
+    safetensors serialization on Windows (issue #13)."""
+    tag = active_model_tag(r'C:\PocketTTS-Server\model\languages\english\english.yaml')
+    # Tag must contain no characters disallowed in Windows filenames.
+    assert not any(c in tag for c in r'\/:*?"<>|')
+    # Stem-derived: english.yaml -> english is the natural choice.
+    assert tag == 'english'
+
+
+def test_active_model_tag_handles_posix_path():
+    """A POSIX absolute path to a custom model yaml should also produce a
+    filename-safe tag derived from the file stem."""
+    tag = active_model_tag('/opt/pocket-tts/models/german_24l.yaml')
+    assert '/' not in tag
+    assert tag == 'german_24l'
+
+
+def test_active_model_tag_idempotent_for_plain_language():
+    """Plain language identifiers must be unaffected by sanitization so the
+    existing tag/cache lookup logic continues to work for built-in models."""
+    assert active_model_tag('german_24l') == 'german_24l'
+    assert active_model_tag('french_24l') == 'french_24l'
+
+
+def test_active_model_tag_strips_dots_from_derived_tag():
+    """A model path like 'english.v2.yaml' must NOT yield a tag with internal
+    dots — `parse_safetensors_name` uses `.` to split <stem>.<tag>.safetensors,
+    so a dotted tag would be mis-parsed and break voice listing."""
+    tag = active_model_tag('/opt/models/english.v2.yaml')
+    assert '.' not in tag
+
+
+def test_active_model_tag_handles_bundled_hash_filename():
+    """The bundled model is named like 'b6369a24.yaml' — the derived tag
+    should be the hex stem, no dots."""
+    tag = active_model_tag('/app/model/b6369a24.yaml')
+    assert tag == 'b6369a24'
+
+
 def test_known_model_tags_includes_all_supported_plus_alias_targets():
     tags = known_model_tags()
     assert 'english_2026-04' in tags

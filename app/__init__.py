@@ -6,7 +6,7 @@ Flask application factory and initialization.
 
 # Keep in sync with pyproject.toml — used as the version fallback when the
 # package isn't installed via pip (e.g. running directly from a clone).
-__version__ = '2.5.3'
+__version__ = '2.5.4'
 
 from flask import Flask
 

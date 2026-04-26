@@ -3,18 +3,42 @@
 Kept separate from tts.py so it can be exercised without loading pocket-tts.
 """
 
+import re
 from pathlib import Path
 
 from app.config import Config
+
+# Substituted away when sanitizing path-derived tags. Includes filesystem-illegal
+# characters AND `.`, since `parse_safetensors_name` uses `.` to delimit
+# <stem>.<tag>.safetensors — a tag containing a dot would mis-parse.
+_TAG_ILLEGAL_CHARS = re.compile(r'[\\/:*?"<>|.]')
+_CONFIG_EXTENSIONS = ('.yaml', '.yml', '.json')
 
 
 def active_model_tag(raw_model: str) -> str:
     """Normalize a language identifier for use as a filename tag.
 
-    Equivalent names (english, english_2026-01, english_2026-04) map to a
-    single canonical tag so cache files don't duplicate.
+    Handles three input shapes:
+      - plain language identifier (e.g. 'english_2026-04') → unchanged
+      - aliased identifier (e.g. 'english') → canonical alias target
+      - custom --model-path value (e.g. r'C:\\models\\english.yaml') →
+        reduced to the file stem ('english'), since path separators and
+        Windows drive colons are illegal in filenames and would crash
+        safetensors serialization (issue #13).
     """
-    return Config.LEGACY_MODEL_ALIASES.get(raw_model, raw_model)
+    canonical = Config.LEGACY_MODEL_ALIASES.get(raw_model, raw_model)
+
+    # If the value looks like a file path (separators present, or it ends in
+    # a known config extension), reduce it to a filesystem-safe stem.
+    if '/' in canonical or '\\' in canonical or canonical.lower().endswith(_CONFIG_EXTENSIONS):
+        last = canonical.replace('\\', '/').rsplit('/', 1)[-1]
+        for ext in _CONFIG_EXTENSIONS:
+            if last.lower().endswith(ext):
+                last = last[: -len(ext)]
+                break
+        canonical = _TAG_ILLEGAL_CHARS.sub('_', last)
+
+    return canonical
 
 
 def known_model_tags() -> set[str]:
