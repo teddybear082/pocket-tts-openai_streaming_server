@@ -8,7 +8,10 @@ from pathlib import Path
 
 from app.config import Config
 
-_ILLEGAL_FS_CHARS = re.compile(r'[\\/:*?"<>|]')
+# Substituted away when sanitizing path-derived tags. Includes filesystem-illegal
+# characters AND `.`, since `parse_safetensors_name` uses `.` to delimit
+# <stem>.<tag>.safetensors — a tag containing a dot would mis-parse.
+_TAG_ILLEGAL_CHARS = re.compile(r'[\\/:*?"<>|.]')
 _CONFIG_EXTENSIONS = ('.yaml', '.yml', '.json')
 
 
@@ -33,7 +36,7 @@ def active_model_tag(raw_model: str) -> str:
             if last.lower().endswith(ext):
                 last = last[: -len(ext)]
                 break
-        canonical = _ILLEGAL_FS_CHARS.sub('_', last)
+        canonical = _TAG_ILLEGAL_CHARS.sub('_', last)
 
     return canonical
 

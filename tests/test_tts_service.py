@@ -355,6 +355,40 @@ def test_get_voice_state_tolerates_safetensor_serialize_error(
 
 
 @patch('app.services.tts._ensure_pocket_tts')
+def test_save_cloned_state_failure_logs_traceback(
+    _ensure, tmp_path, monkeypatch, mock_tts_model, caplog
+):
+    """Cache write failures must include the traceback in logs (via exc_info)
+    so the underlying cause stays diagnosable even though the warning is swallowed."""
+    import logging
+
+    from safetensors import SafetensorError
+
+    voices = tmp_path / 'voices'
+    voices.mkdir()
+    cache = tmp_path / 'voice_cache'
+    (voices / 'emma.wav').write_bytes(b'fake-audio')
+    monkeypatch.setattr('app.config.Config.VOICE_CACHE_DIR', str(cache))
+
+    service = TTSService()
+    service.set_voices_dir(str(voices))
+    mock_tts_model.get_state_for_audio_prompt.return_value = {'fake': 'state'}
+    with patch('app.services.tts.TTSModel') as MockModel:
+        MockModel.load_model.return_value = mock_tts_model
+        service.load_model(language='english', quantize=False)
+
+    with patch('app.services.tts.export_model_state') as mock_export:
+        mock_export.side_effect = SafetensorError('I/O error: simulated failure')
+        with caplog.at_level(logging.WARNING, logger='PocketTTS.tts'):
+            service.get_voice_state('emma')
+
+    cache_warnings = [r for r in caplog.records if 'Could not save voice cache' in r.message]
+    assert cache_warnings, 'expected a warning about the failed cache save'
+    # exc_info must be set so the traceback is captured.
+    assert cache_warnings[0].exc_info is not None
+
+
+@patch('app.services.tts._ensure_pocket_tts')
 def test_get_voice_state_regenerates_when_source_newer(
     _ensure, tmp_path, monkeypatch, mock_tts_model
 ):

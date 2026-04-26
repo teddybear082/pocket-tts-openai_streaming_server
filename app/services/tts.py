@@ -87,12 +87,13 @@ class TTSService:
         target = self.cache_dir / f'{audio_path.stem}.{tag}.safetensors'
         # Caching is best-effort: swallow any failure so a broken cache write
         # never blocks voice loading. safetensors raises SafetensorError (not
-        # OSError) on serialization I/O failures, so we catch broadly.
+        # OSError) on serialization I/O failures, so we catch broadly. Keep
+        # exc_info=True so unexpected failures stay diagnosable.
         try:
             export_model_state(state, target)
             logger.info(f'Saved cloned voice state to {target}')
-        except Exception as e:
-            logger.warning(f'Could not save voice cache to {target}: {e}')
+        except Exception:
+            logger.warning(f'Could not save voice cache to {target}', exc_info=True)
 
     @property
     def is_loaded(self) -> bool:
