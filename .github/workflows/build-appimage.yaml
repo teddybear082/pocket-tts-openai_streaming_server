@@ -84,34 +84,19 @@ jobs:
             --desktop-file AppDir/usr/share/applications/PocketTTS-Server.desktop \
             --icon-file AppDir/usr/share/icons/hicolor/512x512/apps/PocketTTS-Server.png \
             --output appimage
-          
-          # Make app image release
-          mkdir -p PocketTTS-Server-Linux
-          cp PocketTTS-Server-x86_64.AppImage PocketTTS-Server-Linux/
-          cp PocketTTS-Server.desktop PocketTTS-Server-Linux/
-          cp dist/PocketTTS-Server.png PocketTTS-Server-Linux/
-          
-          sed -i 's/Exec=pocket-tts-server/Exec=PocketTTS-Server-x86_64.AppImage/' PocketTTS-Server-Linux/PocketTTS-Server.desktop
-          sed -i 's/Icon=PocketTTS-Server/Icon=PocketTTS-Server.png/' PocketTTS-Server-Linux/PocketTTS-Server.desktop
-          
-          zip -r PocketTTS-Server-Linux-x64.zip PocketTTS-Server-Linux
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: PocketTTS-Server-Linux
-          path: |
-            *.AppImage
-            *.zip
+          path: "*.AppImage"
           retention-days: 30
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            *.AppImage
-            *.zip
+          files: "*.AppImage"
           draft: false
           prerelease: false
           generate_release_notes: true
