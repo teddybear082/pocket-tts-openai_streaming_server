@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=PocketTTS Server
+Comment=OpenAI-compatible TTS API server powered by Pocket-TTS
+Exec=pocket-tts-server
+Icon=PocketTTS-Server
+Terminal=true
+Categories=Development;AudioVideo;

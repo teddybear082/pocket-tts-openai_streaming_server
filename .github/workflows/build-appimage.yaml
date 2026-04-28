@@ -1,0 +1,102 @@
+name: Build Linux AppImage
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller Pillow
+
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --noconfirm --clean --onefile \
+            --name "pocket-tts-server" \
+            --add-data "static:static" \
+            --add-data "templates:templates" \
+            --add-data "voices:voices" \
+            --add-data "app:app" \
+            --collect-all "pocket_tts" \
+            --hidden-import "waitress" \
+            --hidden-import "engineio.async_drivers.threading" \
+            server.py
+
+      - name: Convert logo to 512x512 icon
+        run: |
+          python -c "
+          from PIL import Image
+          import os
+          os.makedirs('dist', exist_ok=True)
+          img = Image.open('static/images/pocket-tts-logo.png').convert('RGBA')
+          img.thumbnail((512, 512), Image.LANCZOS)
+          icon = Image.new('RGBA', (512, 512), (0, 0, 0, 0))
+          x = (512 - img.width) // 2
+          y = (512 - img.height) // 2
+          icon.paste(img, (x, y), img)
+          icon.save('dist/PocketTTS-Server.png', 'PNG')
+          "
+
+      - name: Download linuxdeploy
+        run: |
+          wget -q "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage" \
+            -O /tmp/linuxdeploy.AppImage
+          chmod +x /tmp/linuxdeploy.AppImage
+
+      - name: Build AppImage
+        run: |
+          # Ensure directories exist
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/512x512/apps
+          
+          # Copy assets
+          cp dist/pocket-tts-server AppDir/usr/bin/
+          cp PocketTTS-Server.desktop AppDir/usr/share/applications/
+          cp dist/PocketTTS-Server.png AppDir/usr/share/icons/hicolor/512x512/apps/
+          
+          # Run linuxdeploy
+          export OUTPUT="PocketTTS-Server-x86_64.AppImage"
+          /tmp/linuxdeploy.AppImage \
+            --appdir AppDir \
+            --executable AppDir/usr/bin/pocket-tts-server \
+            --desktop-file AppDir/usr/share/applications/PocketTTS-Server.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/512x512/apps/PocketTTS-Server.png \
+            --output appimage
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PocketTTS-Server-Linux
+          path: "*.AppImage"
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "*.AppImage"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
