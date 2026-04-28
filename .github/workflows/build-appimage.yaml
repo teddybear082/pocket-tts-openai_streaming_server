@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - '*'
-    branches:
-      - add_linux_appimage_workflow
   workflow_dispatch:
 
 jobs:
