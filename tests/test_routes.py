@@ -194,3 +194,69 @@ def test_home_passes_versions_to_template(client, mock_tts_service):
     assert resp.status_code == 200
     html = resp.data.decode()
     assert 'data-server-version=' in html
+
+
+# ── /v1/audio/speech `speed` parameter ─────────────────────────────────────
+
+
+def test_speech_rejects_non_numeric_speed(client, mock_tts_service):
+    resp = client.post(
+        '/v1/audio/speech',
+        json={'input': 'hi', 'voice': 'alba', 'speed': 'fast'},
+    )
+    assert resp.status_code == 400
+    assert 'speed' in resp.get_json()['error'].lower()
+
+
+def test_speech_rejects_speed_below_min(client, mock_tts_service):
+    resp = client.post(
+        '/v1/audio/speech',
+        json={'input': 'hi', 'voice': 'alba', 'speed': 0.1},
+    )
+    assert resp.status_code == 400
+    assert 'between' in resp.get_json()['error'].lower()
+
+
+def test_speech_rejects_speed_above_max(client, mock_tts_service):
+    resp = client.post(
+        '/v1/audio/speech',
+        json={'input': 'hi', 'voice': 'alba', 'speed': 10},
+    )
+    assert resp.status_code == 400
+    assert 'between' in resp.get_json()['error'].lower()
+
+
+def test_speech_default_speed_does_not_invoke_atempo(client, mock_tts_service, monkeypatch):
+    """Sanity check: the default code path (speed omitted, or speed=1.0) must
+    not call into the new ffmpeg helper. Guards against perf regressions on
+    the hot path."""
+    import app.routes as routes_module
+    import app.services.audio as audio_module
+
+    called = []
+    def boom(*args, **kwargs):
+        called.append(True)
+        raise AssertionError('apply_atempo_buffer must not run when speed=1.0')
+
+    monkeypatch.setattr(audio_module, 'apply_atempo_buffer', boom)
+    monkeypatch.setattr(routes_module, 'apply_atempo_buffer', boom)
+
+    # Stub generate_audio + convert_audio so the request completes without
+    # touching pocket-tts or torchaudio.
+    import io
+    mock_tts_service.get_voice_state.return_value = {}
+    mock_tts_service.generate_audio.return_value = MagicMock()
+    monkeypatch.setattr(
+        routes_module, 'convert_audio', lambda *a, **k: io.BytesIO(b'\x00' * 16)
+    )
+
+    # speed omitted
+    resp = client.post('/v1/audio/speech', json={'input': 'hi', 'voice': 'alba'})
+    assert resp.status_code == 200
+    # speed explicitly 1.0
+    resp = client.post(
+        '/v1/audio/speech', json={'input': 'hi', 'voice': 'alba', 'speed': 1.0}
+    )
+    assert resp.status_code == 200
+
+    assert called == []
