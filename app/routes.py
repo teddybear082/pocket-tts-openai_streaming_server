@@ -17,6 +17,10 @@ from flask import (
 from app.config import Config
 from app.logging_config import get_logger
 from app.services.audio import (
+    SPEED_MAX,
+    SPEED_MIN,
+    apply_atempo_buffer,
+    apply_atempo_to_pcm_stream,
     convert_audio,
     get_mime_type,
     tensor_to_pcm_bytes,
@@ -197,6 +201,10 @@ def generate_speech():
         voice: string (optional) - Voice ID or path
         response_format: string (optional) - Audio format
         stream: boolean (optional) - Enable streaming
+        speed: float (optional) - Playback speed multiplier in
+            [0.25, 4.0], default 1.0. When omitted or equal to 1.0 the
+            default code path is unchanged. Other values run the audio
+            through ffmpeg's `atempo` filter (preserves pitch).
 
     Returns:
         Audio file or streaming audio response
@@ -217,6 +225,24 @@ def generate_speech():
 
     response_format = data.get('response_format', 'mp3')
     target_format = validate_format(response_format)
+
+    # `speed` is intentionally only validated when present — clients that
+    # never send the field hit the same code path as before.
+    speed = 1.0
+    if 'speed' in data:
+        try:
+            speed = float(data['speed'])
+        except (TypeError, ValueError):
+            return jsonify({'error': "'speed' must be a number"}), 400
+        if not (SPEED_MIN <= speed <= SPEED_MAX):
+            return jsonify(
+                {
+                    'error': (
+                        f"'speed' must be between {SPEED_MIN} and {SPEED_MAX}"
+                    ),
+                    'received': speed,
+                }
+            ), 400
 
     tts = get_tts_service()
 
@@ -256,8 +282,8 @@ def generate_speech():
             text = text_preprocessor.process(text)
             # logger.info(f'Preprocessed text: {text}')
         if use_streaming:
-            return _stream_audio(tts, voice_state, text, target_format)
-        return _generate_file(tts, voice_state, text, target_format)
+            return _stream_audio(tts, voice_state, text, target_format, speed=speed)
+        return _generate_file(tts, voice_state, text, target_format, speed=speed)
 
     except ValueError as e:
         msg = str(e)
@@ -294,7 +320,7 @@ def generate_speech():
         return jsonify({'error': str(e)}), 500
 
 
-def _generate_file(tts, voice_state, text: str, fmt: str):
+def _generate_file(tts, voice_state, text: str, fmt: str, speed: float = 1.0):
     """Generate complete audio and return as file."""
     t0 = time.time()
     audio_tensor = tts.generate_audio(voice_state, text)
@@ -303,6 +329,8 @@ def _generate_file(tts, voice_state, text: str, fmt: str):
     logger.info(f'Generated {len(text)} chars in {generation_time:.2f}s')
 
     audio_buffer = convert_audio(audio_tensor, tts.sample_rate, fmt)
+    if speed != 1.0:
+        audio_buffer = apply_atempo_buffer(audio_buffer, fmt, speed)
     mimetype = get_mime_type(fmt)
 
     return send_file(
@@ -310,7 +338,7 @@ def _generate_file(tts, voice_state, text: str, fmt: str):
     )
 
 
-def _stream_audio(tts, voice_state, text: str, fmt: str):
+def _stream_audio(tts, voice_state, text: str, fmt: str, speed: float = 1.0):
     """Stream audio chunks."""
     # Normalize streaming format: we always emit PCM bytes, optionally wrapped
     # in a WAV container. For non-PCM/WAV formats (e.g. mp3, opus), coerce to
@@ -324,7 +352,7 @@ def _stream_audio(tts, voice_state, text: str, fmt: str):
         )
         stream_fmt = 'pcm'
 
-    def generate():
+    def pcm_chunks():
         stream = tts.generate_audio_stream(voice_state, text)
         for chunk_tensor in stream:
             yield tensor_to_pcm_bytes(chunk_tensor)
@@ -333,7 +361,12 @@ def _stream_audio(tts, voice_state, text: str, fmt: str):
         # Yield WAV header first if streaming as WAV
         if stream_fmt == 'wav':
             yield write_wav_header(tts.sample_rate, num_channels=1, bits_per_sample=16)
-        yield from generate()
+        if speed == 1.0:
+            yield from pcm_chunks()
+        else:
+            yield from apply_atempo_to_pcm_stream(
+                pcm_chunks(), tts.sample_rate, speed
+            )
 
     mimetype = get_mime_type(stream_fmt)
 
