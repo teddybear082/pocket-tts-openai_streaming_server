@@ -45,6 +45,10 @@ HOST="${INPUT_HOST:-0.0.0.0}"
 # --- 3. Port ---
 read -r -p "Port [49112]: " INPUT_PORT
 PORT="${INPUT_PORT:-49112}"
+if ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
+    echo "[ERROR] Port must be a number."
+    exit 1
+fi
 
 # --- 4. Model Path ---
 echo "Model Config Path (.yaml) or variant name (leave blank for built-in):"
@@ -56,17 +60,11 @@ fi
 
 # --- 5. Voices Directory ---
 DEFAULT_VOICES="$SCRIPT_DIR/voices"
-if [ ! -d "$DEFAULT_VOICES" ]; then
-    DEFAULT_VOICES=""
-fi
-PROMPT_VOICES=""
-if [ -n "$DEFAULT_VOICES" ]; then
-    PROMPT_VOICES="$DEFAULT_VOICES"
-fi
-[ -n "$DEFAULT_VOICES" ] && PROMPT_VOICES="$DEFAULT_VOICES"
-read -r -p "Voices Directory [$(if [ -n "$DEFAULT_VOICES" ]; then echo "$DEFAULT_VOICES"; else echo "None"; fi)]: " INPUT_VOICES
+[ ! -d "$DEFAULT_VOICES" ] && DEFAULT_VOICES="None"
+
+read -r -p "Voices Directory [$DEFAULT_VOICES]: " INPUT_VOICES
 VOICES_ARG=()
-if [ -n "$INPUT_VOICES" ]; then
+if [ -n "$INPUT_VOICES" ] && [ "$INPUT_VOICES" != "None" ]; then
     VOICES_ARG+=("--voices-dir" "$INPUT_VOICES")
 fi
 
@@ -115,7 +113,7 @@ echo "========================================"
 echo ""
 
 # --- Run ---
-python server.py \
+python3 server.py \
     --host "$HOST" \
     --port "$PORT" \
     "${MODEL_ARG[@]+"${MODEL_ARG[@]}"}" \
