@@ -376,6 +376,32 @@ audio {
 	background: rgba(88, 166, 255, 0.1);
 }
 
+.range-labels {
+	display: flex;
+	justify-content: space-between;
+	font-size: 0.75rem;
+	color: var(--text-secondary);
+	margin-top: 4px;
+}
+
+.stats-row {
+	display: flex;
+	justify-content: center;
+	gap: 0.5rem;
+	margin-top: 0.75rem;
+	font-size: 0.85rem;
+	color: var(--text-secondary);
+	font-family: 'SF Mono', 'Consolas', monospace;
+}
+
+.stat-sep {
+	opacity: 0.4;
+}
+
+.stat {
+	white-space: nowrap;
+}
+
 /* Spinner */
 .spinner {
 	display: inline-block;

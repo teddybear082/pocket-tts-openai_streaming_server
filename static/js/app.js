@@ -11,49 +11,47 @@ document.addEventListener('DOMContentLoaded', async () => {
 	const downloadBtn = document.getElementById('download-btn');
 	const streamToggle = document.getElementById('stream-toggle');
 	const formatSelect = document.getElementById('format-select');
+	const speedSlider = document.getElementById('speed-slider');
+	const speedValue = document.getElementById('speed-value');
+	const statsRow = document.getElementById('stats-row');
+	const statLatency = document.getElementById('stat-latency');
+	const statDuration = document.getElementById('stat-duration');
+	const statRtf = document.getElementById('stat-rtf');
 
 	let availableVoices = [];
-	let selectedVoiceId = null; // The actual value used for generation
+	let selectedVoiceId = null;
+	let generateStartTime = 0;
+	let currentStatsId = null;
 
 	// Format & Streaming Logic
 	function updateStreamingAvailability() {
 		const fmt = formatSelect.value;
-		// Server only supports streaming for PCM and WAV currently
-		const supportsStreaming = ['wav', 'pcm'].includes(fmt);
 		const infoLabel = document.getElementById('format-info');
 
-		if (supportsStreaming) {
-			streamToggle.disabled = false;
-			streamToggle.parentElement.title = '';
+		// All formats support streaming now — the server encodes on the fly via
+		// ffmpeg. PCM is raw bytes that won't play in the <audio> element.
+		streamToggle.disabled = false;
+		streamToggle.parentElement.title = '';
 
-			if (fmt === 'pcm') {
-				infoLabel.textContent =
-					"Streaming is available for Raw PCM. Note: This format creates a specialized raw stream that will not play in the browser's audio player.";
-			} else {
-				// WAV
-				infoLabel.textContent =
-					'Streaming is available for WAV. The server streams audio chunks for lower latency.';
-			}
+		if (fmt === 'pcm') {
+			infoLabel.textContent =
+				"Streaming is available for Raw PCM. Note: this format produces raw bytes that will not play in the browser's audio player.";
+		} else if (fmt === 'wav') {
+			infoLabel.textContent =
+				'Streaming is available for WAV. The server streams audio chunks for lower latency.';
 		} else {
-			streamToggle.disabled = true;
-			streamToggle.checked = false;
-			streamToggle.parentElement.title =
-				'Streaming is only available for WAV and PCM formats';
-
-			if (fmt === 'mp3') {
-				infoLabel.textContent =
-					'Streaming is not available for MP3 (Server limitation). A full file will be generated and played.';
-			} else if (['opus', 'aac', 'flac'].includes(fmt)) {
-				infoLabel.textContent = `Streaming is not available for ${fmt.toUpperCase()}. A full file will be generated and played.`;
-			} else {
-				infoLabel.textContent = 'Streaming is not available for this format.';
-			}
+			infoLabel.textContent =
+				`Streaming is available for ${fmt.toUpperCase()}. Audio is streamed and begins playing as soon as enough data arrives.`;
 		}
 	}
 
 	formatSelect.addEventListener('change', updateStreamingAvailability);
 	// Initialize state
 	updateStreamingAvailability();
+
+	speedSlider.addEventListener('input', () => {
+		speedValue.textContent = parseFloat(speedSlider.value).toFixed(2).replace(/\.?0+$/, '');
+	});
 
 	// 1. Load Voices
 	async function loadVoices() {
@@ -435,45 +433,109 @@ document.addEventListener('DOMContentLoaded', async () => {
 		// ... rest of generation logic ...
 		const stream = streamToggle.checked;
 		const fmt = formatSelect.value;
+		const speed = parseFloat(speedSlider.value);
 
 		generateBtn.classList.add('loading');
 		generateBtn.disabled = true;
 		outputSection.classList.remove('active');
+		statsRow.hidden = true;
+		generateStartTime = performance.now();
+
+		function showStats(endTime) {
+			const elapsed = (endTime - generateStartTime) / 1000;
+			statLatency.textContent = `Latency: ${elapsed.toFixed(2)}s`;
+			statDuration.textContent = '';
+			statRtf.textContent = '';
+			statsRow.hidden = false;
+		}
+
+		async function pollStreamStats() {
+			if (!currentStatsId) return;
+			try {
+				const res = await fetch(`/v1/audio/speech/stats?id=${currentStatsId}`);
+				if (!res.ok) return;
+				const data = await res.json();
+				if (data.generation_time != null && data.audio_duration != null) {
+					statDuration.textContent = `Duration: ${data.audio_duration.toFixed(2)}s`;
+					const rtf = data.generation_time > 0
+						? data.audio_duration / data.generation_time
+						: 0;
+					statRtf.textContent = `RTF: ${rtf.toFixed(1)}x`;
+					currentStatsId = null;
+				}
+			} catch {
+			}
+		}
 
 		try {
-			const response = await fetch('/v1/audio/speech', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					model: 'pocket-tts',
+			if (stream && fmt !== 'pcm') {
+				currentStatsId = crypto.randomUUID();
+				const params = new URLSearchParams({
 					input: text,
 					voice: voice,
 					response_format: fmt,
-					stream: stream,
-				}),
-			});
+					stats_id: currentStatsId,
+				});
+				if (speed !== 1.0) params.set('speed', String(speed));
+				const streamUrl = `/v1/audio/speech?${params}`;
+				outputSection.classList.add('active');
+				audioPlayer.src = streamUrl;
+				audioPlayer.oncanplay = () => {
+					showStats(performance.now());
+					audioPlayer.oncanplay = null;
+				};
+				audioPlayer.onended = () => {
+					pollStreamStats();
+					audioPlayer.onended = null;
+				};
+				audioPlayer.play().catch((e) => console.warn('Auto-play blocked:', e));
 
-			if (!response.ok) {
-				const err = await response.json();
-				throw new Error(err.error || response.statusText);
+				downloadBtn.href = streamUrl;
+				downloadBtn.download = `generated_speech.${fmt}`;
+				downloadBtn.onclick = null;
+			} else {
+				const response = await fetch('/v1/audio/speech', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						model: 'pocket-tts',
+						input: text,
+						voice: voice,
+						response_format: fmt,
+						stream: false,
+						...(speed !== 1.0 && { speed }),
+					}),
+				});
+
+				if (!response.ok) {
+					const err = await response.json();
+					throw new Error(err.error || response.statusText);
+				}
+
+				const blob = await response.blob();
+				const url = URL.createObjectURL(blob);
+				audioPlayer.src = url;
+				downloadBtn.href = url;
+				downloadBtn.download = `generated_speech.${fmt}`;
+				downloadBtn.onclick = null;
+
+				audioPlayer.onloadedmetadata = () => {
+					const dur = audioPlayer.duration;
+					const elapsed = (performance.now() - generateStartTime) / 1000;
+					const rtf = dur / elapsed;
+					statLatency.textContent = `Gen: ${elapsed.toFixed(2)}s`;
+					statDuration.textContent = `Duration: ${dur.toFixed(2)}s`;
+					statRtf.textContent = `RTF: ${rtf.toFixed(1)}x`;
+					statsRow.hidden = false;
+				};
+
+				if (fmt !== 'pcm') {
+					audioPlayer
+						.play()
+						.catch((e) => console.warn('Auto-play blocked or failed:', e));
+				}
+				outputSection.classList.add('active');
 			}
-
-			// Currently we always fetch the full blob and play it once ready.
-			// The `stream` flag is still sent to the server, but client playback
-			// uses a single blob path for robustness.
-			const blob = await response.blob();
-			const url = URL.createObjectURL(blob);
-			audioPlayer.src = url;
-			downloadBtn.href = url;
-			downloadBtn.download = `generated_speech.${fmt}`;
-
-			// PCM raw audio usually won't play in standard <audio> elements
-			if (fmt !== 'pcm') {
-				audioPlayer
-					.play()
-					.catch((e) => console.warn('Auto-play blocked or failed:', e));
-			}
-			outputSection.classList.add('active');
 		} catch (e) {
 			alert('Error generating speech: ' + e.message);
 		} finally {

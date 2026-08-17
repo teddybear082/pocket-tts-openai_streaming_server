@@ -196,6 +196,24 @@ Hello! I am Pocket TTS, running locally on your machine. I can clone voices and 
 				</div>
 
 				<div class="control-group">
+					<label for="speed-slider">
+						Speed: <span id="speed-value">1.0</span>x
+					</label>
+					<input
+						type="range"
+						id="speed-slider"
+						min="0.25"
+						max="4.0"
+						step="0.05"
+						value="1.0"
+						style="width: 100%"
+					/>
+					<p class="range-labels">
+						<span>0.25x</span><span>1.0x</span><span>4.0x</span>
+					</p>
+				</div>
+
+				<div class="control-group">
 					<label
 						for="stream-toggle"
 						style="display: inline-flex; align-items: center; cursor: pointer"
@@ -226,6 +244,13 @@ Hello! I am Pocket TTS, running locally on your machine. I can clone voices and 
 
 				<div class="output-section" id="output-section">
 					<audio id="audio-player" controls></audio>
+					<div class="stats-row" id="stats-row" hidden>
+						<span class="stat" id="stat-latency">—</span>
+						<span class="stat-sep">·</span>
+						<span class="stat" id="stat-duration">—</span>
+						<span class="stat-sep">·</span>
+						<span class="stat" id="stat-rtf">—</span>
+					</div>
 					<br />
 					<a href="#" id="download-btn" class="download-link">Download Audio</a>
 				</div>
@@ -348,13 +373,13 @@ Hello! I am Pocket TTS, running locally on your machine. I can clone voices and 
 									<td><code>true</code></td>
 									<td>Enable streaming response for real-time playback</td>
 								</tr>
-								<!-- <tr>
+								<tr>
 									<td><code>speed</code></td>
 									<td>number</td>
 									<td></td>
 									<td><code>1.0</code></td>
 									<td>Playback speed (0.25 to 4.0)</td>
-								</tr> -->
+								</tr>
 							</tbody>
 						</table>
 					</div>
