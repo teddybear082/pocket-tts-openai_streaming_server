@@ -283,6 +283,9 @@ def apply_atempo_to_pcm_stream(
     """
     af_chain = _build_atempo_chain(speed)
 
+    # Raw PCM needs no probing, so skip ffmpeg's input analysis (by default it
+    # reads up to ~5 s of audio before emitting anything) and flush every
+    # output packet: the first audio should leave as soon as it is generated.
     try:
         proc = subprocess.Popen(
             [
@@ -290,6 +293,12 @@ def apply_atempo_to_pcm_stream(
                 '-hide_banner',
                 '-loglevel',
                 'error',
+                '-probesize',
+                '32',
+                '-analyzeduration',
+                '0',
+                '-fflags',
+                'nobuffer',
                 '-f',
                 's16le',
                 '-ar',
@@ -300,6 +309,8 @@ def apply_atempo_to_pcm_stream(
                 'pipe:0',
                 '-af',
                 af_chain,
+                '-flush_packets',
+                '1',
                 '-f',
                 's16le',
                 'pipe:1',
@@ -319,6 +330,7 @@ def apply_atempo_to_pcm_stream(
         try:
             for chunk in pcm_chunks:
                 proc.stdin.write(chunk)
+                proc.stdin.flush()  # don't hold generated audio in Python's buffer
         except BrokenPipeError:
             # ffmpeg exited early; the consumer side will surface stderr.
             pass
@@ -336,7 +348,7 @@ def apply_atempo_to_pcm_stream(
     read_size = 4096
     try:
         while True:
-            data = proc.stdout.read(read_size)
+            data = proc.stdout.read1(read_size)  # whatever is ready, up to read_size
             if not data:
                 break
             yield data
