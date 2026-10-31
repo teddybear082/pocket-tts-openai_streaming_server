@@ -156,6 +156,9 @@ with client.audio.speech.with_streaming_response.create(
 | `voice`           | string  | No       | `alba`  | Voice ID (see `/v1/voices`)                        |
 | `response_format` | string  | No       | `mp3`   | Output format: `mp3`, `wav`, `pcm`, `opus`, `aac`, `flac` |
 | `stream`          | boolean | No       | `false` | Enable streaming response                          |
+| `speed`           | float   | No       | `1.0`   | Playback speed in `[0.25, 4.0]` (preserves pitch via ffmpeg `atempo`). Default `1.0` is a fast no-op. |
+
+> **Note:** `speed` requires `ffmpeg` on the server's `PATH`. ffmpeg is bundled in the Docker image; on bare-metal installs without it, non-default `speed` values are ignored (audio is served at normal speed) and a warning is logged server-side.
 
 ## Custom Voices
 
