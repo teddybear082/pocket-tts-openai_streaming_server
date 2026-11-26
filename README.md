@@ -114,24 +114,19 @@ curl http://localhost:49112/v1/audio/speech \
 from openai import OpenAI
 
 client = OpenAI(
-    base_url="http://localhost:49112/v1",
-    api_key="not-needed"  # No authentication required
+    base_url='http://localhost:49112/v1',
+    api_key='not-needed',  # No authentication required
 )
 
 # Generate and save audio
 response = client.audio.speech.create(
-    model="tts-1",
-    voice="alba",
-    input="Hello world! This is a test."
+    model='tts-1', voice='alba', input='Hello world! This is a test.'
 )
-response.stream_to_file("output.mp3")
+response.stream_to_file('output.mp3')
 
 # Streaming
 with client.audio.speech.with_streaming_response.create(
-    model="tts-1",
-    voice="alba",
-    input="This is streaming audio.",
-    response_format="pcm"
+    model='tts-1', voice='alba', input='This is streaming audio.', response_format='pcm'
 ) as response:
     for chunk in response.iter_bytes():
         # Process audio chunks in real-time
