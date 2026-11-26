@@ -22,7 +22,11 @@ def _ensure_pocket_tts():
     if TTSModel is None:
         try:
             from pocket_tts import TTSModel as _TTSModel
-            from pocket_tts.models.tts_model import export_model_state as _export_state
+            # pocket-tts 3.1 moved it out of tts_model.
+            try:
+                from pocket_tts.models.model_state import export_model_state as _export_state
+            except ImportError:
+                from pocket_tts.models.tts_model import export_model_state as _export_state
 
             TTSModel = _TTSModel
             export_model_state = _export_state
