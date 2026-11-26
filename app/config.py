@@ -102,7 +102,9 @@ class Config:
     LOG_MAX_BYTES = int(os.environ.get('POCKET_TTS_LOG_MAX_BYTES', str(10 * 1024 * 1024)))  # 10MB
     LOG_BACKUP_COUNT = int(os.environ.get('POCKET_TTS_LOG_BACKUP_COUNT', '5'))
 
-    # Built-in voice mappings (these are resolved by pocket-tts internally)
+    # Built-in voice mappings (these are resolved by pocket-tts internally).
+    # Only a fallback: builtin_voices() asks pocket-tts for its own catalogue,
+    # which grows with each release.
     BUILTIN_VOICES = ['alba', 'marius', 'javert', 'jean', 'fantine', 'cosette', 'eponine', 'azelma']
 
     # Supported audio extensions for custom voices

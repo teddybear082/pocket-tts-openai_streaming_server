@@ -478,3 +478,37 @@ def test_list_voices_collapses_per_stem(_ensure, tmp_path, monkeypatch, mock_tts
     voices_list = service.list_voices()
     custom_ids = [v['id'] for v in voices_list if v['type'] == 'custom']
     assert custom_ids == ['emma', 'morgan']
+
+
+def _fake_pocket_tts_catalogue(monkeypatch, names):
+    import sys
+    import types
+
+    module = types.ModuleType('pocket_tts.utils.utils')
+    module._ORIGINS_OF_PREDEFINED_VOICES = {name: f'hf://x/{name}.wav' for name in names}
+    monkeypatch.setitem(sys.modules, 'pocket_tts.utils.utils', module)
+
+
+def test_voice_from_pocket_tts_catalogue_is_valid(monkeypatch, service):
+    _fake_pocket_tts_catalogue(monkeypatch, ['alba', 'estelle'])
+
+    assert service.validate_voice('estelle') == (True, 'Built-in voice: estelle')
+    assert service.validate_voice('Estelle')[0] is True
+
+
+def test_list_voices_includes_pocket_tts_catalogue(monkeypatch, service):
+    _fake_pocket_tts_catalogue(monkeypatch, ['alba', 'estelle'])
+
+    builtin = [v['id'] for v in service.list_voices() if v['type'] == 'builtin']
+    assert builtin == ['alba', 'estelle']
+
+
+def test_builtin_voices_fall_back_when_catalogue_moves(monkeypatch):
+    """pocket-tts keeps the catalogue under a private name; it may move."""
+    import sys
+
+    from app.config import Config
+    from app.services.tts import builtin_voices
+
+    monkeypatch.setitem(sys.modules, 'pocket_tts.utils.utils', None)
+    assert builtin_voices() == Config.BUILTIN_VOICES

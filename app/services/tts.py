@@ -30,6 +30,20 @@ def _ensure_pocket_tts():
             raise ImportError('pocket-tts not found. Install with: pip install pocket-tts') from exc
 
 
+def builtin_voices() -> list[str]:
+    """The voices pocket-tts ships, by name.
+
+    Read from pocket-tts itself, so voices added in later releases (estelle,
+    anna, ...) are accepted without a change here; Config.BUILTIN_VOICES is the
+    fallback if that ever moves.
+    """
+    try:
+        from pocket_tts.utils.utils import _ORIGINS_OF_PREDEFINED_VOICES
+    except ImportError:
+        return list(Config.BUILTIN_VOICES)
+    return list(_ORIGINS_OF_PREDEFINED_VOICES)
+
+
 class TTSService:
     """
     Service class for Text-to-Speech operations.
@@ -388,7 +402,7 @@ class TTSService:
             return voice_id_or_path
 
         # Built-in names pass through untouched (pocket-tts handles resolution).
-        if voice_id_or_path.lower() in Config.BUILTIN_VOICES:
+        if voice_id_or_path.lower() in builtin_voices():
             return voice_id_or_path.lower()
 
         # Absolute path hit.
@@ -441,7 +455,7 @@ class TTSService:
             return False, str(e)
 
         # Built-in voices are always valid
-        if resolved.lower() in Config.BUILTIN_VOICES:
+        if resolved.lower() in builtin_voices():
             return True, f'Built-in voice: {resolved}'
 
         # HuggingFace URLs - assume valid
@@ -490,7 +504,7 @@ class TTSService:
         voices: list[dict] = []
 
         # Built-in voices (sorted).
-        for name in sorted(Config.BUILTIN_VOICES):
+        for name in sorted(builtin_voices()):
             voices.append({'id': name, 'name': name.capitalize(), 'type': 'builtin'})
 
         voices_path = Path(self.voices_dir) if self.voices_dir else None
